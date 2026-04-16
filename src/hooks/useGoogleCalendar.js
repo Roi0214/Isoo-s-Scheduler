@@ -1,58 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import ICAL from 'ical.js'
 
-const PROXIES = [
-  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
-]
-
-// 타임아웃 포함 fetch (AbortSignal.timeout 미지원 브라우저 대응)
-async function fetchWithTimeout(url, ms = 8000) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), ms)
-  try {
-    return await fetch(url, {
-      signal: controller.signal,
-      cache: 'no-cache',                          // 브라우저 캐시 무시
-      headers: { 'Cache-Control': 'no-cache' },
-    })
-  } finally {
-    clearTimeout(timer)
+/**
+ * Vercel Serverless Function(/api/calendar)을 통해 ICS 데이터를 가져옵니다.
+ * 서버가 구글에 직접 요청하므로 브라우저 CORS 문제가 없습니다.
+ */
+async function fetchCalendar(icalUrl) {
+  const apiUrl = `/api/calendar?url=${encodeURIComponent(icalUrl)}`
+  const res = await fetch(apiUrl, { cache: 'no-cache' })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`캘린더 응답 오류 (${res.status}): ${body.slice(0, 120)}`)
   }
-}
-
-async function fetchWithFallback(icalUrl) {
-  // 1) 직접 시도
-  try {
-    const res  = await fetchWithTimeout(icalUrl, 5000)
-    const text = await res.text()
-    if (text.includes('BEGIN:VCALENDAR')) {
-      console.log('[GCal] 직접 fetch 성공')
-      return text
-    }
-  } catch (e) {
-    console.warn('[GCal] 직접 fetch 실패:', e.message)
+  const text = await res.text()
+  if (!text.includes('BEGIN:VCALENDAR')) {
+    throw new Error('유효하지 않은 ICS 데이터입니다.')
   }
-
-  // 2) 프록시 순차 시도
-  for (const makeUrl of PROXIES) {
-    const proxyUrl = makeUrl(icalUrl)
-    try {
-      const res  = await fetchWithTimeout(proxyUrl)
-      if (!res.ok) { console.warn('[GCal] proxy HTTP', res.status, proxyUrl); continue }
-      const text = await res.text()
-      if (text.includes('BEGIN:VCALENDAR')) {
-        console.log('[GCal] proxy 성공:', proxyUrl)
-        return text
-      }
-      console.warn('[GCal] proxy 응답이 ICS 아님:', text.slice(0, 120))
-    } catch (e) {
-      console.warn('[GCal] proxy 실패:', proxyUrl, e.message)
-    }
-  }
-
-  throw new Error('모든 경로 실패 — 캘린더가 공개/비밀 주소인지 확인해 주세요.')
+  return text
 }
 
 // floating time (TZID 없음) 여부
@@ -141,7 +105,7 @@ export function useGoogleCalendar(icalUrl) {
     setLoading(true)
     setError(null)
     try {
-      const text = await fetchWithFallback(icalUrl)
+      const text = await fetchCalendar(icalUrl)
       const comp = new ICAL.Component(ICAL.parse(text))
 
       const now        = new Date()
@@ -149,10 +113,10 @@ export function useGoogleCalendar(icalUrl) {
       const rangeEnd   = new Date(now); rangeEnd.setMonth(now.getMonth() + 6)
 
       const parsed = expandEvents(comp, rangeStart, rangeEnd)
-      console.log(`[GCal] 파싱 완료 (${icalUrl.slice(0,40)}…): ${parsed.length}개`)
+      console.log(`[GCal] 파싱 완료 (${icalUrl.slice(0, 40)}…): ${parsed.length}개`)
       setEvents(parsed)
     } catch (err) {
-      console.error('[GCal] 최종 실패:', err.message)
+      console.error('[GCal] 실패:', err.message)
       setError(err.message)
     } finally {
       setLoading(false)
