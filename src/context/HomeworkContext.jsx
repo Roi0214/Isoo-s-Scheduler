@@ -1,11 +1,26 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { HOMEWORKS } from '../data/homeworkData'
 
 const HomeworkContext = createContext(null)
 
+function loadFromStorage(key, fallback) {
+  try {
+    const saved = localStorage.getItem(key)
+    return saved ? JSON.parse(saved) : fallback
+  } catch {
+    return fallback
+  }
+}
+
 export function HomeworkProvider({ children }) {
   // ── 숙제 목록 상태 ──────────────────────────────
-  const [homeworks, setHomeworks] = useState(HOMEWORKS)
+  const [homeworks, setHomeworks] = useState(() =>
+    loadFromStorage('kid-scheduler:homeworks', HOMEWORKS)
+  )
+
+  useEffect(() => {
+    localStorage.setItem('kid-scheduler:homeworks', JSON.stringify(homeworks))
+  }, [homeworks])
 
   const addHomework = useCallback((item) => {
     setHomeworks(prev => [...prev, { ...item, id: `hw-${Date.now()}`, googleCalendarId: null }])
@@ -20,7 +35,13 @@ export function HomeworkProvider({ children }) {
   }, [])
 
   // ── 완료 상태 ───────────────────────────────────
-  const [completedSet, setCompletedSet] = useState(new Set())
+  const [completedSet, setCompletedSet] = useState(() =>
+    new Set(loadFromStorage('kid-scheduler:hwCompleted', []))
+  )
+
+  useEffect(() => {
+    localStorage.setItem('kid-scheduler:hwCompleted', JSON.stringify([...completedSet]))
+  }, [completedSet])
 
   const isCompleted = useCallback((hwId) => completedSet.has(hwId), [completedSet])
 

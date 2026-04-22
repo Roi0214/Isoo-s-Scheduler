@@ -1,11 +1,26 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import { SCHEDULES, DEFAULT_CATEGORIES, buildCategories } from '../data/scheduleData'
 
 const ScheduleContext = createContext(null)
 
+function loadFromStorage(key, fallback) {
+  try {
+    const saved = localStorage.getItem(key)
+    return saved ? JSON.parse(saved) : fallback
+  } catch {
+    return fallback
+  }
+}
+
 export function ScheduleProvider({ children }) {
   // ── 분류 상태 ───────────────────────────────────
-  const [categoryMap, setCategoryMap] = useState(DEFAULT_CATEGORIES)
+  const [categoryMap, setCategoryMap] = useState(() =>
+    loadFromStorage('kid-scheduler:categoryMap', DEFAULT_CATEGORIES)
+  )
+
+  useEffect(() => {
+    localStorage.setItem('kid-scheduler:categoryMap', JSON.stringify(categoryMap))
+  }, [categoryMap])
 
   // color/dot 포함된 완성형 분류 객체 (메모이제이션)
   const categories = useMemo(() => buildCategories(categoryMap), [categoryMap])
@@ -27,7 +42,13 @@ export function ScheduleProvider({ children }) {
   }, [])
 
   // ── 일정 목록 상태 ──────────────────────────────
-  const [schedules, setSchedules] = useState(SCHEDULES)
+  const [schedules, setSchedules] = useState(() =>
+    loadFromStorage('kid-scheduler:schedules', SCHEDULES)
+  )
+
+  useEffect(() => {
+    localStorage.setItem('kid-scheduler:schedules', JSON.stringify(schedules))
+  }, [schedules])
 
   const addSchedule = useCallback((item) => {
     setSchedules(prev => [...prev, { ...item, id: `schedule-${Date.now()}`, exceptions: [], googleCalendarId: null }])
@@ -82,7 +103,13 @@ export function ScheduleProvider({ children }) {
   }, [])
 
   // ── 날짜별 완료 상태 ────────────────────────────
-  const [completedMap, setCompletedMap] = useState({})
+  const [completedMap, setCompletedMap] = useState(() =>
+    loadFromStorage('kid-scheduler:scheduleCompleted', {})
+  )
+
+  useEffect(() => {
+    localStorage.setItem('kid-scheduler:scheduleCompleted', JSON.stringify(completedMap))
+  }, [completedMap])
 
   const isCompleted = useCallback((scheduleId, dateStr) =>
     !!completedMap[`${scheduleId}_${dateStr}`], [completedMap])
