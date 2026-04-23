@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, Plus } from 'lucide-react'
 import WeekNavigator from '../components/weekly/WeekNavigator'
 import WeeklyTimetable from '../components/weekly/WeeklyTimetable'
 import ScheduleFormModal from '../components/schedule/ScheduleFormModal'
@@ -18,6 +18,8 @@ export default function WeeklyPage() {
   const [editState, setEditState] = useState(null)  // { item, date }
   const editItem = editState?.item ?? null
   const editApplyDate = editState?.date ?? null
+
+  const [addModalOpen, setAddModalOpen] = useState(false)
 
   const isCurrentWeek = weekDates.some(d => isSameDay(d, today))
 
@@ -68,6 +70,21 @@ export default function WeeklyPage() {
           item,
           date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
         })}
+      />
+
+      {/* FAB */}
+      <button
+        onClick={() => setAddModalOpen(true)}
+        className="fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center active:scale-95 transition-transform z-30"
+        aria-label="일정 추가"
+      >
+        <Plus size={26} strokeWidth={2.5} />
+      </button>
+
+      {/* 추가 모달 */}
+      <ScheduleFormModal
+        isOpen={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
       />
 
       {/* 수정 모달 */}
