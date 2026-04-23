@@ -1,4 +1,15 @@
 /**
+ * Date 객체를 로컬 시간 기준 'YYYY-MM-DD' 문자열로 변환
+ * (toISOString()은 UTC 기준이라 한국 시간대에서 하루 차이 발생)
+ */
+export function localDateStr(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
  * 주어진 날짜가 속한 주의 월~일 7일 배열 반환
  */
 export function getWeekDates(date) {

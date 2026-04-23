@@ -253,7 +253,10 @@ export const SCHEDULES = [
  */
 export function getSchedulesForDate(schedules, date) {
   const dayOfWeek = date.getDay()
-  const isoDate = date.toISOString().slice(0, 10)
+  const y = date.getFullYear()
+  const mo = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const isoDate = `${y}-${mo}-${d}`
 
   return schedules
     .filter(s =>

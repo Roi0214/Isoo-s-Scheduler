@@ -83,7 +83,8 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
     resetAndClose()
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const today_ = new Date()
+  const todayStr = `${today_.getFullYear()}-${String(today_.getMonth() + 1).padStart(2, '0')}-${String(today_.getDate()).padStart(2, '0')}`
 
   return (
     <>

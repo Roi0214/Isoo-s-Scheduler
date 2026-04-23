@@ -62,7 +62,7 @@ export function ScheduleProvider({ children }) {
   const scheduleChangeFrom = useCallback((id, fromDate, newFields) => {
     const prev_ = new Date(fromDate + 'T00:00:00')
     prev_.setDate(prev_.getDate() - 1)
-    const effectiveTo = prev_.toISOString().slice(0, 10)
+    const effectiveTo = `${prev_.getFullYear()}-${String(prev_.getMonth() + 1).padStart(2, '0')}-${String(prev_.getDate()).padStart(2, '0')}`
 
     setSchedules(prev => {
       const existing = prev.find(s => s.id === id)
@@ -97,7 +97,7 @@ export function ScheduleProvider({ children }) {
       }
       const prevDay = new Date(fromDate + 'T00:00:00')
       prevDay.setDate(prevDay.getDate() - 1)
-      const effectiveTo = prevDay.toISOString().slice(0, 10)
+      const effectiveTo = `${prevDay.getFullYear()}-${String(prevDay.getMonth() + 1).padStart(2, '0')}-${String(prevDay.getDate()).padStart(2, '0')}`
       return prev.map(s => s.id === id ? { ...s, effectiveTo } : s)
     })
   }, [])

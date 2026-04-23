@@ -34,7 +34,9 @@ export default function WeeklyPage() {
     acc + getSchedulesForDate(schedules, date).filter(s => s.category !== 'mission').length, 0)
 
   // 이번 주 숙제 마감 수
-  const weekDateStrs = new Set(weekdays.map(d => d.toISOString().slice(0, 10)))
+  const weekDateStrs = new Set(weekdays.map(d =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  ))
   const weekHomeworkCount = homeworks.filter(hw => weekDateStrs.has(hw.dueDate)).length
 
   return (

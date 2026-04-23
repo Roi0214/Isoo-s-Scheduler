@@ -66,7 +66,7 @@ export default function SchedulePage() {
   const daySchedules = getSchedulesForDate(schedules, selectedDate)
   const externalEvents = getEventsForDate(selectedDate)
   const allDayEvents   = getAllDayForDate(selectedDate)
-  const dateStr = selectedDate.toISOString().slice(0, 10)
+  const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
   const isToday = isSameDay(selectedDate, today)
   const nowStr  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
 
@@ -206,7 +206,7 @@ export default function SchedulePage() {
         isOpen={scheduleModalOpen}
         onClose={closeScheduleModal}
         editItem={editItem}
-        applyDate={selectedDate.toISOString().slice(0, 10)}
+        applyDate={dateStr}
       />
 
       <HomeworkFormModal
