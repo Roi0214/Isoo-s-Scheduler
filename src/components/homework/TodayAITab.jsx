@@ -1,4 +1,4 @@
-import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react'
 import AIHomeworkBlock from './AIHomeworkBlock'
 import { useAISchedule } from '../../context/AIScheduleContext'
 import { useHomework } from '../../context/HomeworkContext'
@@ -15,7 +15,10 @@ function dateLabel(dateStr) {
 }
 
 export default function TodayAITab() {
-  const { aiSchedule, isGenerating, error, generateSchedule, clearSchedule } = useAISchedule()
+  const {
+    aiSchedule, isGenerating, error,
+    generateSchedule, loadDummySchedule, clearError, clearSchedule,
+  } = useAISchedule()
   const { homeworks } = useHomework()
   const { schedules } = useSchedule()
   const { getEventsForDate } = useGCal()
@@ -23,23 +26,27 @@ export default function TodayAITab() {
 
   const now = new Date()
   const today = localDateStr(now)
-
-  // 이번 주 월요일 기준
   const weekDates = getWeekDates(now)
   const weekMonday = weekDates[0]
 
-  // Google 이벤트 수집 (전체 주) — getEventsForDate는 Date 객체를 받음
+  // Google 이벤트 수집 — API는 자동 호출하지 않고 데이터만 준비
   const allGoogleEvents = weekDates.flatMap(d => {
     const dateStr = localDateStr(d)
     return (getEventsForDate(d) || []).map(e => ({ ...e, date: dateStr }))
   })
 
+  // ── 버튼 핸들러 ─────────────────────────────────────────────
+  // ※ generateSchedule은 오직 이 함수를 통해서만 호출됨 (자동 호출 없음)
   const handleGenerate = () => {
     if (isGenerating) {
-      console.log('[TodayAITab] ⚠️ 이미 생성 중 — 버튼 클릭 무시')
+      console.log('[TodayAITab] ⚠️ 생성 중 — 클릭 무시')
       return
     }
     generateSchedule(homeworks, schedules, allGoogleEvents, weekMonday)
+  }
+
+  const handleDummy = () => {
+    loadDummySchedule()
   }
 
   const toggleDay = (dateStr) =>
@@ -52,15 +59,13 @@ export default function TodayAITab() {
       if (!blocksByDate[block.date]) blocksByDate[block.date] = []
       blocksByDate[block.date].push(block)
     }
-    // 시간 정렬
     for (const dateStr of Object.keys(blocksByDate)) {
       blocksByDate[dateStr].sort((a, b) => a.start_time.localeCompare(b.start_time))
     }
   }
-
   const scheduledDates = Object.keys(blocksByDate).sort()
 
-  // 생성 중
+  // ── 생성 중 ────────────────────────────────────────────────
   if (isGenerating) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
@@ -73,7 +78,7 @@ export default function TodayAITab() {
     )
   }
 
-  // 오류 (aiSchedule이 없고 에러가 있을 때 — 미생성 화면보다 먼저 체크)
+  // ── 에러 상태 ──────────────────────────────────────────────
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -82,20 +87,34 @@ export default function TodayAITab() {
         </div>
         <div className="text-center">
           <p className="text-sm font-bold text-red-600 mb-1">배분 생성 실패</p>
-          <p className="text-xs text-slate-400 leading-relaxed max-w-xs">{error}</p>
+          <p className="text-xs text-slate-400 leading-relaxed max-w-xs break-all">{error}</p>
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={14} /> 다시 시도
-        </button>
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm disabled:opacity-50"
+          >
+            <RefreshCw size={14} /> 다시 시도
+          </button>
+          <button
+            onClick={handleDummy}
+            className="flex items-center justify-center gap-2 bg-slate-100 text-slate-600 px-5 py-2.5 rounded-2xl font-semibold text-sm"
+          >
+            <FlaskConical size={14} /> 더미 데이터로 UI 확인
+          </button>
+          <button
+            onClick={clearError}
+            className="text-xs text-slate-400 py-1 text-center"
+          >
+            에러 무시하고 초기 화면으로
+          </button>
+        </div>
       </div>
     )
   }
 
-  // 미생성 상태
+  // ── 미생성 초기 상태 ───────────────────────────────────────
   if (!aiSchedule) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-5">
@@ -109,6 +128,8 @@ export default function TodayAITab() {
             이번 주 최적 시간표를 자동 생성합니다.
           </p>
         </div>
+
+        {/* 실제 AI 생성 버튼 */}
         <button
           onClick={handleGenerate}
           disabled={isGenerating}
@@ -117,15 +138,27 @@ export default function TodayAITab() {
           <Sparkles size={16} />
           AI 주간 배분 생성
         </button>
-        <div className="text-xs text-slate-300 text-center leading-relaxed px-4">
-          Gemini 1.5 Flash · 5대 규칙 적용<br />
+
+        {/* 더미 데이터 미리보기 버튼 */}
+        <button
+          onClick={handleDummy}
+          className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-100 px-4 py-2 rounded-xl font-medium"
+        >
+          <FlaskConical size={12} />
+          더미 데이터로 UI 미리보기
+        </button>
+
+        <p className="text-xs text-slate-300 text-center leading-relaxed px-4">
+          Gemini 2.0 Flash Lite · 5대 규칙 적용<br />
           (전날 완료·보카 복습·분할·난이도·수면 보호)
-        </div>
+        </p>
       </div>
     )
   }
 
-  // 생성 완료
+  // ── 생성 완료 ──────────────────────────────────────────────
+  const isDummy = aiSchedule.blocks.some(b => b.homework_id?.startsWith('dummy-'))
+
   return (
     <div>
       {/* 상단 메타 + 액션 */}
@@ -133,11 +166,17 @@ export default function TodayAITab() {
         <div>
           <div className="flex items-center gap-1.5">
             <Sparkles size={14} className="text-indigo-500" />
-            <p className="text-sm font-bold text-slate-700">AI 주간 배분 결과</p>
+            <p className="text-sm font-bold text-slate-700">
+              AI 주간 배분 결과
+              {isDummy && (
+                <span className="ml-1.5 text-xs font-normal text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">
+                  더미 데이터
+                </span>
+              )}
+            </p>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            {aiSchedule.week_start} 주차 ·{' '}
-            {aiSchedule.blocks.length}개 블록 배분
+            {aiSchedule.week_start} 주차 · {aiSchedule.blocks.length}개 블록
           </p>
         </div>
         <div className="flex gap-2">
@@ -146,7 +185,7 @@ export default function TodayAITab() {
             disabled={isGenerating}
             className="flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <RefreshCw size={11} /> 재생성
+            <RefreshCw size={11} /> {isDummy ? 'AI 생성' : '재생성'}
           </button>
           <button
             onClick={clearSchedule}
@@ -163,7 +202,7 @@ export default function TodayAITab() {
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle size={14} className="text-amber-500" />
             <p className="text-xs font-bold text-amber-700">
-              {aiSchedule.unscheduled.length}개 숙제를 배분하지 못했어요
+              {aiSchedule.unscheduled.length}개 미배분
             </p>
           </div>
           <div className="flex flex-col gap-1">
@@ -177,28 +216,23 @@ export default function TodayAITab() {
         </div>
       )}
 
-      {/* 날짜별 블록 목록 */}
+      {/* 날짜별 블록 */}
       {scheduledDates.length === 0 ? (
         <div className="text-center py-10 text-slate-400 text-sm">배분된 숙제가 없어요</div>
       ) : (
         scheduledDates.map(dateStr => {
           const isToday = dateStr === today
           const blocks = blocksByDate[dateStr]
-          // 오늘은 기본 펼침
           const isOpen = isToday ? (expandedDays[dateStr] !== false) : (expandedDays[dateStr] === true)
 
           return (
             <div key={dateStr} className="mb-4">
-              {/* 날짜 헤더 */}
               <button
                 onClick={() => toggleDay(dateStr)}
                 className="w-full flex items-center gap-2 mb-2 group"
               >
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full
-                  ${isToday
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-500'
-                  }`}
+                  ${isToday ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}
                 >
                   {isToday ? '오늘 ' : ''}{dateLabel(dateStr)}
                 </span>

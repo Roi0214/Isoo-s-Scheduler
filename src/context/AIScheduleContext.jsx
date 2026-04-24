@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
-import { localDateStr } from '../utils/weekUtils'
+import { localDateStr, getWeekDates } from '../utils/weekUtils'
 
 const AIScheduleContext = createContext(null)
 
@@ -12,6 +12,72 @@ function loadFromStorage(key, fallback) {
   }
 }
 
+// ── 더미 데이터 (API 없이 UI 확인용) ──────────────────────────
+function buildDummySchedule() {
+  const now = new Date()
+  const weekDates = getWeekDates(now)
+  const weekStart = localDateStr(weekDates[0])
+
+  // 오늘 ~ 이번주 범위 내에서 더미 블록 생성
+  const d0 = localDateStr(weekDates[1]) // 화
+  const d1 = localDateStr(weekDates[2]) // 수
+  const d2 = localDateStr(weekDates[3]) // 목
+
+  return {
+    week_start: weekStart,
+    generated_at: new Date().toISOString(),
+    blocks: [
+      {
+        homework_id: 'dummy-1',
+        homework_title: '[더미] 단원평가 1장 (하윤네 수학)',
+        subject: 'math',
+        date: d0,
+        start_time: '19:00',
+        end_time: '19:30',
+        units_today: null,
+        reason: '난이도 중, 학원 전날 배치',
+      },
+      {
+        homework_id: 'dummy-2',
+        homework_title: '[더미] 트윈클 픽션 리딩 지문',
+        subject: 'english',
+        date: d0,
+        start_time: '19:30',
+        end_time: '20:00',
+        units_today: null,
+        reason: '학원 D-1 배치',
+      },
+      {
+        homework_id: 'dummy-3',
+        homework_title: '[더미] 수학과외 숙제 Part 1',
+        subject: 'math',
+        date: d1,
+        start_time: '19:00',
+        end_time: '19:40',
+        units_today: null,
+        reason: '난이도 상, 저녁 19~21시 배치',
+      },
+      {
+        homework_id: 'dummy-4',
+        homework_title: '[더미] 트윈클 보카 20개',
+        subject: 'english',
+        date: d2,
+        start_time: '20:00',
+        end_time: '20:20',
+        units_today: 20,
+        reason: '분할 배분, 학원 D-1',
+      },
+    ],
+    unscheduled: [
+      {
+        homework_id: 'dummy-x',
+        homework_title: '[더미] CNA 주간 과제',
+        reason: '주말로 이월 (22:30 초과)',
+      },
+    ],
+  }
+}
+
 export function AIScheduleProvider({ children }) {
   const [aiSchedule, setAiSchedule] = useState(() =>
     loadFromStorage('kid-scheduler:aiSchedule', null)
@@ -19,10 +85,7 @@ export function AIScheduleProvider({ children }) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState(null)
 
-  // ── 동기적 중복 호출 방어용 ref ──────────────────────────────
-  // React state 업데이트는 비동기라서 연속 클릭 시 isGenerating이
-  // true가 되기 전에 두 번째 호출이 시작될 수 있음.
-  // useRef는 동기적으로 즉시 반영되므로 확실하게 막아줌.
+  // ── 동기적 중복 호출 방어 ref ──────────────────────────────
   const inFlightRef = useRef(false)
 
   useEffect(() => {
@@ -33,10 +96,34 @@ export function AIScheduleProvider({ children }) {
     }
   }, [aiSchedule])
 
+  // ──────────────────────────────────────────────────────────
+  // ※ 자동 호출 없음 — generateSchedule은 오직 사용자 버튼 클릭으로만 실행됨.
+  //   useEffect로 API를 자동 호출하는 코드는 이 파일에 존재하지 않음.
+  // ──────────────────────────────────────────────────────────
+
+  /** API 없이 더미 데이터로 즉시 UI 확인 */
+  const loadDummySchedule = useCallback(() => {
+    console.log('[AISchedule] 더미 데이터 로드 — API 미호출')
+    setAiSchedule(buildDummySchedule())
+    setError(null)
+  }, [])
+
+  /** 에러만 초기화 (schedule 유지) */
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+
+  /** schedule + error 전체 초기화 */
+  const clearSchedule = useCallback(() => {
+    setAiSchedule(null)
+    setError(null)
+  }, [])
+
+  /** AI 주간 배분 생성 — 오직 사용자 명시적 호출로만 실행 */
   const generateSchedule = useCallback(async (homeworks, schedules, googleEvents, weekMonday) => {
-    // ── 중복 호출 원천 차단 (동기 ref 체크) ─────────────────────
+    // 중복 호출 원천 차단 (동기 ref)
     if (inFlightRef.current) {
-      console.log('[AISchedule] ⚠️ 이미 생성 중 — 중복 호출 차단됨')
+      console.log('[AISchedule] ⚠️ 이미 생성 중 — 중복 호출 차단')
       return
     }
 
@@ -60,7 +147,7 @@ export function AIScheduleProvider({ children }) {
       }
 
       const data = await response.json()
-      console.log(`[AISchedule] ✅ Gemini API 호출 완료 — blocks: ${data.blocks?.length ?? 0}, unscheduled: ${data.unscheduled?.length ?? 0}`)
+      console.log(`[AISchedule] ✅ Gemini API 완료 — blocks: ${data.blocks?.length ?? 0}`)
 
       setAiSchedule({
         week_start: weekStart,
@@ -69,18 +156,13 @@ export function AIScheduleProvider({ children }) {
         unscheduled: data.unscheduled ?? [],
       })
     } catch (err) {
-      console.error('[AISchedule] ❌ Gemini API 호출 실패:', err.message)
+      console.error('[AISchedule] ❌ 실패:', err.message)
       setError(err.message)
     } finally {
       inFlightRef.current = false
       setIsGenerating(false)
-      console.log('[AISchedule] ■ 호출 종료 — inFlight 해제')
+      console.log('[AISchedule] ■ 호출 종료')
     }
-  }, [])
-
-  const clearSchedule = useCallback(() => {
-    setAiSchedule(null)
-    setError(null)
   }, [])
 
   const getBlocksForDate = useCallback((dateStr) => {
@@ -94,6 +176,8 @@ export function AIScheduleProvider({ children }) {
       isGenerating,
       error,
       generateSchedule,
+      loadDummySchedule,
+      clearError,
       clearSchedule,
       getBlocksForDate,
     }}>
