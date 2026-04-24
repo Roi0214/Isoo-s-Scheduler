@@ -1,10 +1,53 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, School, BookOpen } from 'lucide-react'
 import HomeworkItem from './HomeworkItem'
 import HomeworkFilter from './HomeworkFilter'
 import HomeworkFormModal from './HomeworkFormModal'
-import { groupHomeworksByDueDate, getDueDateLabel } from '../../data/homeworkData'
+import { HW_SUBJECTS } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
+
+const FREE_KEY = '__free__'
+
+/**
+ * linked_event(학원명) 기준으로 숙제를 그룹화
+ * linked_event가 없으면 '__free__' 그룹으로 묶음
+ */
+function groupByAcademy(homeworks) {
+  const groups = {}
+  for (const hw of homeworks) {
+    const key = hw.linked_event?.trim() || FREE_KEY
+    if (!groups[key]) groups[key] = []
+    groups[key].push(hw)
+  }
+  return groups
+}
+
+/**
+ * 그룹 키를 정렬: 학원명 그룹 먼저(가나다순), 자율학습 마지막
+ */
+function sortedGroupKeys(groups) {
+  return Object.keys(groups).sort((a, b) => {
+    if (a === FREE_KEY) return 1
+    if (b === FREE_KEY) return -1
+    return a.localeCompare(b, 'ko')
+  })
+}
+
+/**
+ * 그룹 내 주요 과목 색상 (첫 번째 항목 기준)
+ */
+function groupAccentColor(items) {
+  const subj = items[0]?.subject
+  const map = {
+    math:    'bg-orange-100 text-orange-700 border-orange-200',
+    english: 'bg-green-100 text-green-700 border-green-200',
+    science: 'bg-teal-100 text-teal-700 border-teal-200',
+    korean:  'bg-blue-100 text-blue-700 border-blue-200',
+    mission: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    reading: 'bg-purple-100 text-purple-700 border-purple-200',
+  }
+  return map[subj] ?? 'bg-slate-100 text-slate-600 border-slate-200'
+}
 
 export default function BacklogTab() {
   const { homeworks, isCompleted, completedCount } = useHomework()
@@ -20,24 +63,14 @@ export default function BacklogTab() {
   const openEdit = (item) => { setEditItem(item); setModalOpen(true) }
   const closeModal = () => { setModalOpen(false); setEditItem(null) }
 
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-
   const filtered = homeworks.filter(hw => {
     if (filter === 'done') return isCompleted(hw.id)
     if (filter === 'todo') return !isCompleted(hw.id)
     return true
   })
 
-  // 기한 지난 미완료 → 오늘로 롤오버
-  const withRollover = filtered.map(hw => {
-    if (!isCompleted(hw.id) && hw.dueDate < today) {
-      return { ...hw, dueDate: today, rolledOver: true }
-    }
-    return hw
-  })
-
-  const groups = groupHomeworksByDueDate(withRollover)
+  const groups   = groupByAcademy(filtered)
+  const keys     = sortedGroupKeys(groups)
   const totalCount = homeworks.length
 
   return (
@@ -66,7 +99,7 @@ export default function BacklogTab() {
 
       <HomeworkFilter active={filter} onChange={setFilter} />
 
-      {Object.keys(groups).length === 0 ? (
+      {keys.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
           <span className="text-4xl">🎉</span>
           <p className="text-sm font-medium">
@@ -79,37 +112,60 @@ export default function BacklogTab() {
           )}
         </div>
       ) : (
-        Object.entries(groups).map(([dueDate, items]) => {
-          const isToday   = dueDate === today
-          const isWeekend = dueDate.startsWith('weekend:')
-          const isOpen = isToday ? !(collapsed[dueDate] === true) : (collapsed[dueDate] === true)
+        keys.map(key => {
+          const items    = groups[key]
+          const isFree   = key === FREE_KEY
+          const label    = isFree ? '자율 학습' : key
+          const accent   = groupAccentColor(items)
           const doneCount = items.filter(hw => isCompleted(hw.id)).length
+          const isOpen   = collapsed[key] !== true   // 기본 펼침
 
           return (
-            <div key={dueDate} className="mb-3">
+            <div key={key} className="mb-5">
+              {/* 그룹 헤더 */}
               <button
-                onClick={() => toggleCollapse(dueDate)}
-                className="w-full flex items-center gap-2 mb-2 group"
+                onClick={() => toggleCollapse(key)}
+                className="w-full flex items-center gap-2 mb-2.5 group"
               >
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full
-                  ${isToday
-                    ? 'bg-red-100 text-red-600'
-                    : isWeekend
-                      ? 'bg-blue-100 text-blue-600'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}>
-                  {getDueDateLabel(dueDate)}
+                {/* 학원 아이콘 + 배지 */}
+                <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-xl border ${accent}`}>
+                  {isFree
+                    ? <BookOpen size={12} />
+                    : <School size={12} />
+                  }
+                  {label}
                 </span>
-                <span className="text-xs text-slate-300">{doneCount}/{items.length}</span>
-                <span className="ml-auto text-slate-300 group-hover:text-slate-400">
+
+                {/* 완료 카운트 */}
+                <span className="text-xs text-slate-300 font-medium">
+                  {doneCount}/{items.length}
+                </span>
+
+                {/* 완료율 미니바 */}
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-1">
+                  <div
+                    className="h-full bg-indigo-300 rounded-full transition-all duration-300"
+                    style={{ width: `${items.length === 0 ? 0 : (doneCount / items.length) * 100}%` }}
+                  />
+                </div>
+
+                {/* 토글 아이콘 */}
+                <span className="text-slate-300 group-hover:text-slate-400 transition-colors flex-shrink-0">
                   {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </span>
               </button>
 
+              {/* 접힌 상태: 미완료 제목 칩 미리보기 */}
               {!isOpen && (
-                <div onClick={() => toggleCollapse(dueDate)} className="flex flex-wrap gap-1.5 cursor-pointer px-1">
+                <div
+                  onClick={() => toggleCollapse(key)}
+                  className="flex flex-wrap gap-1.5 cursor-pointer px-1 mb-1"
+                >
                   {items.filter(hw => !isCompleted(hw.id)).map(hw => (
-                    <span key={hw.id} className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full truncate max-w-[120px]">
+                    <span
+                      key={hw.id}
+                      className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full truncate max-w-[140px]"
+                    >
                       {hw.title}
                     </span>
                   ))}
@@ -119,10 +175,16 @@ export default function BacklogTab() {
                 </div>
               )}
 
+              {/* 펼친 상태: 숙제 카드 목록 */}
               {isOpen && (
                 <div className="flex flex-col gap-2">
                   {items.map(hw => (
-                    <HomeworkItem key={hw.id} item={hw} onEdit={() => openEdit(hw)} />
+                    <HomeworkItem
+                      key={hw.id}
+                      item={hw}
+                      onEdit={() => openEdit(hw)}
+                      showDueDate
+                    />
                   ))}
                 </div>
               )}

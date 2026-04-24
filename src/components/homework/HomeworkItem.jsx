@@ -1,9 +1,15 @@
-import { Check, RotateCcw, ChevronDown, ChevronUp, Pencil, CalendarClock } from 'lucide-react'
+import { Check, RotateCcw, ChevronDown, ChevronUp, Pencil, Calendar } from 'lucide-react'
 import { useState } from 'react'
-import { HW_SUBJECTS, PRIORITY } from '../../data/homeworkData'
+import { HW_SUBJECTS, PRIORITY, getDueDateLabel } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
 
-export default function HomeworkItem({ item, onEdit }) {
+const DIFFICULTY_BADGE = {
+  '상': 'bg-red-50 text-red-500',
+  '중': 'bg-yellow-50 text-yellow-600',
+  '하': 'bg-green-50 text-green-600',
+}
+
+export default function HomeworkItem({ item, onEdit, showDueDate = false }) {
   const { isCompleted, toggleCompleted } = useHomework()
   const [expanded, setExpanded] = useState(false)
 
@@ -11,13 +17,18 @@ export default function HomeworkItem({ item, onEdit }) {
   const subj = HW_SUBJECTS[item.subject] ?? HW_SUBJECTS.etc
   const prio = PRIORITY[item.priority]
 
+  // 마감일 레이블 (weekend: 키 처리 포함)
+  const dueDateLabel = showDueDate && item.dueDate
+    ? getDueDateLabel(item.dueDate)
+    : null
+
   return (
     <div className={`relative bg-white rounded-2xl border shadow-sm overflow-hidden transition-all
       ${done ? 'border-slate-100 opacity-60' : 'border-slate-200'}`}>
 
-      {/* 상단: 우선순위 컬러 바 */}
+      {/* 우선순위 컬러 바 */}
       <div className={`h-1 w-full ${
-        item.priority === 'high' ? 'bg-red-400' :
+        item.priority === 'high'   ? 'bg-red-400' :
         item.priority === 'medium' ? 'bg-yellow-400' : 'bg-slate-200'
       }`} />
 
@@ -45,13 +56,19 @@ export default function HomeworkItem({ item, onEdit }) {
 
           {/* 본문 */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
+            {/* 배지 행 */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-1">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${subj.color}`}>
                 {subj.label}
               </span>
               <span className={`text-xs font-medium ${prio.color}`}>
                 {prio.label}
               </span>
+              {item.difficulty && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${DIFFICULTY_BADGE[item.difficulty] ?? ''}`}>
+                  난이도 {item.difficulty}
+                </span>
+              )}
               {item.repeat && (
                 <span className="flex items-center gap-0.5 text-xs text-slate-400">
                   <RotateCcw size={10} />매일
@@ -59,25 +76,35 @@ export default function HomeworkItem({ item, onEdit }) {
               )}
             </div>
 
+            {/* 밀린 숙제 표시 */}
             {item.rolledOver && (
               <span className="inline-flex items-center gap-0.5 text-xs text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full mb-1">
                 ↩ 밀린 숙제
               </span>
             )}
-            <p className={`text-base font-semibold leading-snug transition-all
+
+            {/* 제목 */}
+            <p className={`text-base font-semibold leading-snug
               ${done ? 'line-through text-slate-400' : 'text-slate-800'}`}>
               {item.title}
             </p>
 
-            {/* 일정에서 추가된 숙제 표시 */}
-            {item.linkedScheduleTitle && (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
-                <CalendarClock size={10} />
-                {item.linkedScheduleTitle}
+            {/* 마감일 (학원별 그룹에서 날짜 구분용) */}
+            {dueDateLabel && (
+              <span className="inline-flex items-center gap-1 text-xs text-slate-400 mt-1">
+                <Calendar size={10} />
+                {dueDateLabel}
               </span>
             )}
 
-            {/* 메모 — 펼치기/접기 */}
+            {/* 소요 시간 (AI 배분 참고용) */}
+            {item.estimated_minutes && (
+              <span className="ml-2 text-xs text-slate-300">
+                약 {item.estimated_minutes}분
+              </span>
+            )}
+
+            {/* 메모 */}
             {item.memo && (
               <>
                 <button
