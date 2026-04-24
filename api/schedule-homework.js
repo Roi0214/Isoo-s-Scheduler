@@ -122,48 +122,52 @@ function buildLinkedEventMap(schedules, weekDates) {
   return map
 }
 
-// ── Gemini API 호출 ──────────────────────────────────────────
-async function callGemini(prompt) {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
+// ── Groq API 호출 ────────────────────────────────────────────
+async function callGroq(prompt) {
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey) throw new Error('GROQ_API_KEY 환경변수가 설정되지 않았습니다.')
 
-  // gemini-2.0-flash-lite: 무료 티어 지원 모델
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`
+  const url = 'https://api.groq.com/openai/v1/chat/completions'
 
   const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-      maxOutputTokens: 4096,
-    },
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      {
+        role: 'system',
+        content: '당신은 초등학생 숙제 배분 전문가입니다. 반드시 유효한 JSON만 출력하세요. 마크다운, 설명, 코드블록 일절 금지.',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.2,
+    max_tokens: 4096,
   }
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
     body: JSON.stringify(body),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Gemini API 오류 ${res.status}: ${err}`)
+    throw new Error(`Groq API 오류 ${res.status}: ${err}`)
   }
 
   const data = await res.json()
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!raw) throw new Error('Gemini 응답이 비어 있습니다.')
-
-  // 마크다운 코드 블록(```json ... ```) 안전 제거 후 파싱
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim()
+  const raw = data?.choices?.[0]?.message?.content
+  if (!raw) throw new Error('Groq 응답이 비어 있습니다.')
 
   try {
-    return JSON.parse(cleaned)
+    return JSON.parse(raw)
   } catch {
-    throw new Error(`Gemini 응답 JSON 파싱 실패:\n${cleaned.slice(0, 200)}`)
+    throw new Error(`Groq 응답 JSON 파싱 실패:\n${raw.slice(0, 200)}`)
   }
 }
 
@@ -250,8 +254,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 허용됩니다.' })
 
   // ── [DEBUG] 환경변수 상태 로깅 ─────────────────────────────
-  const apiKey = process.env.GEMINI_API_KEY
-  console.log('[schedule-homework] GEMINI_API_KEY 상태:', apiKey
+  const apiKey = process.env.GROQ_API_KEY
+  console.log('[schedule-homework] GROQ_API_KEY 상태:', apiKey
     ? `설정됨 (길이: ${apiKey.length}, 앞4자: ${apiKey.slice(0, 4)}...)`
     : '❌ 없음 — Vercel 환경변수 미설정')
   console.log('[schedule-homework] Node 버전:', process.version)
@@ -259,7 +263,7 @@ export default async function handler(req, res) {
 
   if (!apiKey) {
     return res.status(500).json({
-      error: 'GEMINI_API_KEY가 서버에 설정되어 있지 않습니다. Vercel 대시보드 → Settings → Environment Variables를 확인하세요.',
+      error: 'GROQ_API_KEY가 서버에 설정되어 있지 않습니다. Vercel 대시보드 → Settings → Environment Variables를 확인하세요.',
       debug: { keySet: false },
     })
   }
@@ -294,9 +298,9 @@ export default async function handler(req, res) {
     }
 
     const prompt = buildPrompt(backlog, schedules, googleEvents || [], weekDates)
-    console.log('[schedule-homework] Gemini 호출 시작...')
-    const result = await callGemini(prompt)
-    console.log('[schedule-homework] Gemini 응답 수신 완료. blocks:', result.blocks?.length ?? 0)
+    console.log('[schedule-homework] Groq 호출 시작...')
+    const result = await callGroq(prompt)
+    console.log('[schedule-homework] Groq 응답 수신 완료. blocks:', result.blocks?.length ?? 0)
 
     // 응답 검증
     const blocks = Array.isArray(result.blocks) ? result.blocks : []
@@ -314,7 +318,7 @@ export default async function handler(req, res) {
     console.error('[schedule-homework] ❌ 오류:', err.message)
     return res.status(500).json({
       error: `AI 배분 실패: ${err.message}`,
-      debug: { step: 'callGemini or buildPrompt' },
+      debug: { step: 'callGroq or buildPrompt' },
     })
   }
 }
