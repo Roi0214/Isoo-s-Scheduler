@@ -127,12 +127,13 @@ async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
 
-  // v1 엔드포인트 사용 (responseMimeType은 v1beta 전용이므로 제거)
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`
+  // v1beta + gemini-2.0-flash (1.5-flash 계열은 API에서 제공 안 됨 확인됨)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
+      responseMimeType: 'application/json',
       temperature: 0.2,
       maxOutputTokens: 4096,
     },
