@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, Circle } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, RotateCcw } from 'lucide-react'
 import { HW_SUBJECTS } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
 
@@ -41,10 +41,19 @@ export default function AIHomeworkBlock({ block }) {
 
       {/* 내용 */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
+        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${subj.color}`}>
             {subj.label}
           </span>
+          {block.rolledOver && (
+            <span className="flex items-center gap-0.5 text-xs text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-md font-semibold">
+              <RotateCcw size={10} />
+              밀린 숙제
+              {block.originalDate && (
+                <span className="text-orange-300 font-normal ml-0.5">({block.originalDate})</span>
+              )}
+            </span>
+          )}
           {block.units_today != null && (
             <span className="text-xs bg-indigo-100 text-indigo-600 font-semibold px-1.5 py-0.5 rounded-md">
               {block.units_today}단위

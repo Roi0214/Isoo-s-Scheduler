@@ -1,4 +1,4 @@
-import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical } from 'lucide-react'
+import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical, RotateCcw } from 'lucide-react'
 import AIHomeworkBlock from './AIHomeworkBlock'
 import { useAISchedule } from '../../context/AIScheduleContext'
 import { useHomework } from '../../context/HomeworkContext'
@@ -18,11 +18,13 @@ export default function TodayAITab() {
   const {
     aiSchedule, isGenerating, error,
     generateSchedule, loadDummySchedule, clearError, clearSchedule,
+    rolloverPastBlocks,
   } = useAISchedule()
-  const { homeworks } = useHomework()
+  const { homeworks, isCompleted } = useHomework()
   const { schedules } = useSchedule()
   const { getEventsForDate } = useGCal()
   const [expandedDays, setExpandedDays] = useState({})
+  const [rolledOver, setRolledOver] = useState(false)
 
   const now = new Date()
   const today = localDateStr(now)
@@ -34,6 +36,16 @@ export default function TodayAITab() {
     const dateStr = localDateStr(d)
     return (getEventsForDate(d) || []).map(e => ({ ...e, date: dateStr }))
   })
+
+  // ── 밀린 숙제 감지 ──────────────────────────────────────────
+  const pastIncomplete = aiSchedule?.blocks.filter(
+    b => b.date < today && !isCompleted(b.homework_id) && !b.rolledOver
+  ) ?? []
+
+  const handleRollover = () => {
+    const count = rolloverPastBlocks(today, isCompleted)
+    if (count > 0) setRolledOver(true)
+  }
 
   // ── 버튼 핸들러 ─────────────────────────────────────────────
   // ※ generateSchedule은 오직 이 함수를 통해서만 호출됨 (자동 호출 없음)
@@ -195,6 +207,40 @@ export default function TodayAITab() {
           </button>
         </div>
       </div>
+
+      {/* 밀린 숙제 배너 */}
+      {pastIncomplete.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RotateCcw size={14} className="text-orange-500" />
+              <p className="text-sm font-bold text-orange-700">
+                완료 못 한 숙제 {pastIncomplete.length}개
+              </p>
+            </div>
+            <button
+              onClick={handleRollover}
+              className="text-xs font-bold text-orange-600 bg-orange-100 px-3 py-1.5 rounded-xl active:bg-orange-200"
+            >
+              오늘로 옮기기
+            </button>
+          </div>
+          <div className="mt-2 flex flex-col gap-1">
+            {pastIncomplete.map(b => (
+              <p key={b.homework_id} className="text-xs text-orange-500 truncate pl-1">
+                · {b.homework_title}
+                <span className="text-orange-300 ml-1">({b.date})</span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {rolledOver && pastIncomplete.length === 0 && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-3 py-2 mb-3 text-xs text-indigo-500 font-medium">
+          ↩ 밀린 숙제를 오늘 일정에 추가했어요
+        </div>
+      )}
 
       {/* 미배분 경고 */}
       {aiSchedule.unscheduled?.length > 0 && (

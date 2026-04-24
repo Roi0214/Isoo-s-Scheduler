@@ -170,6 +170,28 @@ export function AIScheduleProvider({ children }) {
     return aiSchedule.blocks.filter(b => b.date === dateStr)
   }, [aiSchedule])
 
+  /**
+   * 오늘 이전 날짜 중 미완료 블록을 오늘로 이동
+   * @param {string} today - 'YYYY-MM-DD'
+   * @param {(id: string) => boolean} isCompletedFn - HomeworkContext의 isCompleted
+   * @returns {number} 롤오버된 항목 수
+   */
+  const rolloverPastBlocks = useCallback((today, isCompletedFn) => {
+    if (!aiSchedule) return 0
+    let count = 0
+    setAiSchedule(prev => ({
+      ...prev,
+      blocks: prev.blocks.map(block => {
+        if (block.date < today && !isCompletedFn(block.homework_id) && !block.rolledOver) {
+          count++
+          return { ...block, date: today, rolledOver: true, originalDate: block.date }
+        }
+        return block
+      }),
+    }))
+    return count
+  }, [aiSchedule])
+
   return (
     <AIScheduleContext.Provider value={{
       aiSchedule,
@@ -180,6 +202,7 @@ export function AIScheduleProvider({ children }) {
       clearError,
       clearSchedule,
       getBlocksForDate,
+      rolloverPastBlocks,
     }}>
       {children}
     </AIScheduleContext.Provider>
