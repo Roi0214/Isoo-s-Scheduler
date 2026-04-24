@@ -294,6 +294,22 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 허용됩니다.' })
 
+  // ── [DEBUG] 환경변수 상태 로깅 ─────────────────────────────
+  const apiKey = process.env.GEMINI_API_KEY
+  console.log('[schedule-homework] GEMINI_API_KEY 상태:', apiKey
+    ? `설정됨 (길이: ${apiKey.length}, 앞4자: ${apiKey.slice(0, 4)}...)`
+    : '❌ 없음 — Vercel 환경변수 미설정')
+  console.log('[schedule-homework] Node 버전:', process.version)
+  console.log('[schedule-homework] 요청 메서드:', req.method)
+
+  if (!apiKey) {
+    return res.status(500).json({
+      error: 'GEMINI_API_KEY가 서버에 설정되어 있지 않습니다. Vercel 대시보드 → Settings → Environment Variables를 확인하세요.',
+      debug: { keySet: false },
+    })
+  }
+  // ── [DEBUG] 끝 ────────────────────────────────────────────
+
   let body
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
@@ -307,24 +323,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'homeworks, schedules, weekStart 필드가 필요합니다.' })
   }
 
-  // weekStart가 월요일인지 검증 (0=일, 1=월)
+  // weekStart 요일 검증 — 월요일이 아니면 그냥 통과 (엄격 검증 완화)
   const startDow = getDayOfWeek(weekStart)
-  if (startDow !== 1) {
-    return res.status(400).json({ error: `weekStart는 월요일이어야 합니다. (받은 요일: ${startDow})` })
-  }
+  console.log('[schedule-homework] weekStart:', weekStart, '/ 요일(0=일):', startDow)
 
   try {
     const weekDates = getWeekDates(weekStart)
 
     // 배분 대상: 미완료 백로그 숙제만
     const backlog = homeworks.filter(hw => hw.status !== 'completed')
+    console.log('[schedule-homework] 배분 대상 숙제 수:', backlog.length)
 
     if (backlog.length === 0) {
       return res.status(200).json({ blocks: [], unscheduled: [] })
     }
 
     const prompt = buildPrompt(backlog, schedules, googleEvents || [], weekDates)
+    console.log('[schedule-homework] Gemini 호출 시작...')
     const result = await callGemini(prompt)
+    console.log('[schedule-homework] Gemini 응답 수신 완료. blocks:', result.blocks?.length ?? 0)
 
     // 응답 검증
     const blocks = Array.isArray(result.blocks) ? result.blocks : []
@@ -339,7 +356,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ blocks: enrichedBlocks, unscheduled })
   } catch (err) {
-    console.error('[api/schedule-homework] 오류:', err.message)
-    return res.status(500).json({ error: `AI 배분 실패: ${err.message}` })
+    console.error('[schedule-homework] ❌ 오류:', err.message)
+    return res.status(500).json({
+      error: `AI 배분 실패: ${err.message}`,
+      debug: { step: 'callGemini or buildPrompt' },
+    })
   }
 }
