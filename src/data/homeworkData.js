@@ -14,6 +14,12 @@ export const PRIORITY = {
   low:    { label: '여유', color: 'text-slate-400',  bg: 'bg-slate-50' },
 }
 
+export const DIFFICULTY = {
+  '상': { label: '상', color: 'bg-red-100 text-red-700' },
+  '중': { label: '중', color: 'bg-yellow-100 text-yellow-700' },
+  '하': { label: '하', color: 'bg-green-100 text-green-700' },
+}
+
 // 이번 주 특정 요일 날짜 반환 (0=일 ~ 6=토)
 function thisWeekDay(dayOfWeek) {
   const today = new Date()
@@ -24,13 +30,19 @@ function thisWeekDay(dayOfWeek) {
   const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
   const d = new Date(monday)
   d.setDate(monday.getDate() + offset)
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function relativeDate(offset) {
   const d = new Date()
   d.setDate(d.getDate() + offset)
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export const HOMEWORKS = [
@@ -39,103 +51,166 @@ export const HOMEWORKS = [
     id: 'hw-hayoon-math-mon-1',
     subject: 'math',
     title: '단원평가 1장 (하윤네 수학)',
-    dueDate: thisWeekDay(2),    // 화요일까지
+    dueDate: thisWeekDay(2),
     priority: 'high',
     memo: '월요일 하윤네 수학 숙제',
     repeat: false,
     linkedScheduleTitle: '하윤네 수학 (월) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 30,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '하윤네 수학',
   },
   {
     id: 'hw-hayoon-math-mon-2',
     subject: 'math',
     title: '연산 1장 (하윤네 수학)',
-    dueDate: thisWeekDay(2),    // 화요일까지
+    dueDate: thisWeekDay(2),
     priority: 'medium',
     memo: '월요일 하윤네 수학 숙제',
     repeat: false,
     linkedScheduleTitle: '하윤네 수학 (월) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '하',
+    estimated_minutes: 20,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '하윤네 수학',
   },
   {
     id: 'hw-math-tutor-mon',
     subject: 'math',
     title: '수학과외 숙제 Part 1',
-    dueDate: thisWeekDay(3),    // 수요일까지 (수요일 미션: 월요일 숙제 완료)
+    dueDate: thisWeekDay(3),
     priority: 'high',
     memo: '월요일 수학과외 당일 수업 숙제',
     repeat: false,
     linkedScheduleTitle: '수학과외 (월) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '상',
+    estimated_minutes: 40,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '수학과외',
   },
   // ── 수요일 수업 숙제 ──────────────────────────────────────
   {
     id: 'hw-hayoon-math-wed-1',
     subject: 'math',
     title: '단원평가 1장 (하윤네 수학)',
-    dueDate: thisWeekDay(4),    // 목요일까지
+    dueDate: thisWeekDay(4),
     priority: 'high',
     memo: '수요일 하윤네 수학 숙제',
     repeat: false,
     linkedScheduleTitle: '하윤네 수학 (수) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 30,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '하윤네 수학',
   },
   {
     id: 'hw-hayoon-math-wed-2',
     subject: 'math',
     title: '연산 1장 (하윤네 수학)',
-    dueDate: thisWeekDay(4),    // 목요일까지
+    dueDate: thisWeekDay(4),
     priority: 'medium',
     memo: '수요일 하윤네 수학 숙제',
     repeat: false,
     linkedScheduleTitle: '하윤네 수학 (수) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '하',
+    estimated_minutes: 20,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '하윤네 수학',
   },
   // ── 목요일 수업 숙제 ──────────────────────────────────────
   {
     id: 'hw-twinkle-fiction-thu',
     subject: 'english',
     title: '트윈클 픽션 리딩 지문 읽기',
-    dueDate: thisWeekDay(5),    // 금요일까지
+    dueDate: thisWeekDay(5),
     priority: 'high',
     memo: '목요일 트윈클 픽션 수업 숙제',
     repeat: false,
     linkedScheduleTitle: '트윈클 픽션 (목) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 25,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '트윈클 픽션',
   },
   // ── 금요일 수업 숙제 ──────────────────────────────────────
   {
     id: 'hw-math-tutor-fri',
     subject: 'math',
     title: '수학과외 숙제 Part 1',
-    dueDate: thisWeekDay(0),    // 일요일까지 (주말 미션)
+    dueDate: thisWeekDay(0),
     priority: 'high',
     memo: '금요일 수학과외 당일 수업 숙제',
     repeat: false,
     linkedScheduleTitle: '수학과외 (금) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '상',
+    estimated_minutes: 40,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '수학과외',
   },
   {
     id: 'hw-hayoon-math-fri-1',
     subject: 'math',
     title: '단원평가 1장 (하윤네 수학)',
-    dueDate: thisWeekDay(0),    // 일요일까지 (주말 미션)
+    dueDate: thisWeekDay(0),
     priority: 'high',
     memo: '금요일 하윤네 수학 숙제',
     repeat: false,
     linkedScheduleTitle: '하윤네 수학 (금) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 30,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '하윤네 수학',
   },
   {
     id: 'hw-hayoon-math-fri-2',
     subject: 'math',
     title: '연산 1장 (하윤네 수학)',
-    dueDate: thisWeekDay(0),    // 일요일까지
+    dueDate: thisWeekDay(0),
     priority: 'medium',
     memo: '금요일 하윤네 수학 숙제',
     repeat: false,
     linkedScheduleTitle: '하윤네 수학 (금) 숙제',
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '하',
+    estimated_minutes: 20,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '하윤네 수학',
   },
   // ── 등교 전 미션 (매일) ───────────────────────────────────
   {
@@ -147,17 +222,31 @@ export const HOMEWORKS = [
     memo: '매일 등교 전 완료',
     repeat: true,
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '하',
+    estimated_minutes: 15,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: null,
   },
   // ── 주말 집중 미션 ─────────────────────────────────────────
   {
     id: 'hw-weekend-twinkle',
     subject: 'english',
     title: '트윈클 픽션/논픽션 보카 1회전 & 픽션 라이팅',
-    dueDate: thisWeekDay(0),    // 일요일까지
+    dueDate: thisWeekDay(0),
     priority: 'high',
     memo: '주말 집중 미션 — 트윈클',
     repeat: false,
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '상',
+    estimated_minutes: 60,
+    is_divisible: true,
+    unit: 20,
+    total_units: 60,
+    linked_event: '트윈클 픽션',
   },
   {
     id: 'hw-weekend-cna',
@@ -168,40 +257,70 @@ export const HOMEWORKS = [
     memo: '주말 집중 미션 — CNA',
     repeat: false,
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '상',
+    estimated_minutes: 45,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: null,
   },
   {
     id: 'hw-weekend-science',
     subject: 'science',
     title: '와이즈만 오투과학 & 과학일기 작성',
-    dueDate: thisWeekDay(4),    // 목요일 수업 전날(수)까지
+    dueDate: thisWeekDay(4),
     priority: 'high',
     memo: '목요일 미션 — 와이즈만 준비',
     repeat: false,
     googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 35,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '와이즈만',
   },
 ]
 
+/**
+ * 기존 localStorage 데이터에 신규 필드가 없을 경우 기본값으로 채워주는 마이그레이션
+ */
+export function migrateHomework(hw) {
+  return {
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 30,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: hw.linkedScheduleTitle ?? null,
+    ...hw,
+  }
+}
+
 const WEEKDAY_SHORT = ['일', '월', '화', '수', '목', '금', '토']
 
-// 토(6)/일(0) 여부
 function isWeekend(dueDate) {
   const [y, mo, d] = dueDate.split('-').map(Number)
   const day = new Date(y, mo - 1, d).getDay()
   return day === 0 || day === 6
 }
 
-// 해당 주의 토요일 ISO 날짜 반환 (주말 그룹 키로 사용)
 function getSaturdayKey(dueDate) {
   const [y, mo, d] = dueDate.split('-').map(Number)
   const dateObj = new Date(y, mo - 1, d)
-  const day = dateObj.getDay() // 0=일, 6=토
-  const diff = day === 6 ? 0 : -1  // 일요일이면 하루 전(토)으로
+  const day = dateObj.getDay()
+  const diff = day === 6 ? 0 : -1
   const sat = new Date(dateObj)
   sat.setDate(dateObj.getDate() + diff)
-  return `weekend:${sat.toISOString().slice(0, 10)}`
+  const sy = sat.getFullYear()
+  const sm = String(sat.getMonth() + 1).padStart(2, '0')
+  const sd = String(sat.getDate()).padStart(2, '0')
+  return `weekend:${sy}-${sm}-${sd}`
 }
 
-// 주말 키에서 토~일 날짜 범위 텍스트 추출
 function weekendLabel(key) {
   const satStr = key.replace('weekend:', '')
   const sat = new Date(satStr + 'T00:00:00')
@@ -215,8 +334,12 @@ function weekendLabel(key) {
 export function getDueDateLabel(dueDate) {
   if (dueDate.startsWith('weekend:')) return weekendLabel(dueDate)
 
-  const today = new Date().toISOString().slice(0, 10)
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const tmrDate = new Date(now)
+  tmrDate.setDate(now.getDate() + 1)
+  const tomorrow = `${tmrDate.getFullYear()}-${String(tmrDate.getMonth()+1).padStart(2,'0')}-${String(tmrDate.getDate()).padStart(2,'0')}`
+
   const [y, mo, d] = dueDate.split('-').map(Number)
   const dateObj = new Date(y, mo - 1, d)
   const wd = WEEKDAY_SHORT[dateObj.getDay()]
@@ -227,13 +350,11 @@ export function getDueDateLabel(dueDate) {
 }
 
 export function groupHomeworksByDueDate(homeworks) {
-  // 토/일 항목은 해당 주 토요일 키로 통합
   const mapped = homeworks.map(hw => ({
     ...hw,
     _groupKey: isWeekend(hw.dueDate) ? getSaturdayKey(hw.dueDate) : hw.dueDate,
   }))
 
-  // 그룹 키 기준 정렬 (weekend: 키는 날짜 부분으로 비교)
   const sorted = [...mapped].sort((a, b) => {
     const ka = a._groupKey.replace('weekend:', '')
     const kb = b._groupKey.replace('weekend:', '')

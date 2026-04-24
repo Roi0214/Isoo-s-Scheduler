@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { HOMEWORKS } from '../data/homeworkData'
+import { HOMEWORKS, migrateHomework } from '../data/homeworkData'
 
 const HomeworkContext = createContext(null)
 
@@ -13,9 +13,9 @@ function loadFromStorage(key, fallback) {
 }
 
 export function HomeworkProvider({ children }) {
-  // ── 숙제 목록 상태 ──────────────────────────────
+  // ── 숙제 목록 상태 — 로드 시 마이그레이션 적용 ──────────
   const [homeworks, setHomeworks] = useState(() =>
-    loadFromStorage('kid-scheduler:homeworks', HOMEWORKS)
+    loadFromStorage('kid-scheduler:homeworks', HOMEWORKS).map(migrateHomework)
   )
 
   useEffect(() => {
@@ -23,7 +23,10 @@ export function HomeworkProvider({ children }) {
   }, [homeworks])
 
   const addHomework = useCallback((item) => {
-    setHomeworks(prev => [...prev, { ...item, id: `hw-${Date.now()}`, googleCalendarId: null }])
+    setHomeworks(prev => [
+      ...prev,
+      migrateHomework({ ...item, id: `hw-${Date.now()}`, googleCalendarId: null }),
+    ])
   }, [])
 
   const updateHomework = useCallback((id, updates) => {
@@ -34,7 +37,7 @@ export function HomeworkProvider({ children }) {
     setHomeworks(prev => prev.filter(h => h.id !== id))
   }, [])
 
-  // ── 완료 상태 ───────────────────────────────────
+  // ── 완료 상태 ───────────────────────────────────────────
   const [completedSet, setCompletedSet] = useState(() =>
     new Set(loadFromStorage('kid-scheduler:hwCompleted', []))
   )

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Trash2, CalendarClock } from 'lucide-react'
+import { Trash2, CalendarClock, ChevronDown, ChevronUp } from 'lucide-react'
 import Modal from '../common/Modal'
-import { HW_SUBJECTS, PRIORITY } from '../../data/homeworkData'
+import { HW_SUBJECTS, PRIORITY, DIFFICULTY } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-// 일정 카테고리 → 숙제 과목 매핑
 const CATEGORY_TO_SUBJECT = {
   school:   'korean',
   math:     'math',
@@ -25,13 +25,16 @@ const EMPTY_FORM = {
   priority: 'medium',
   memo: '',
   repeat: false,
+  // AI 배분용 신규 필드
+  status: 'backlog',
+  difficulty: '중',
+  estimated_minutes: 30,
+  is_divisible: false,
+  unit: null,
+  total_units: null,
+  linked_event: '',
 }
 
-/**
- * @param {object} prefill  - 일정 카드에서 자동 채워주는 값
- *   { subject, dueDate, sourceTitle }
- *   sourceTitle: "수학학원 전날 준비" 같은 컨텍스트 레이블
- */
 export default function HomeworkFormModal({ isOpen, onClose, editItem = null, prefill = null }) {
   const { addHomework, updateHomework, deleteHomework } = useHomework()
   const isEdit = !!editItem
@@ -45,6 +48,13 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
         priority: editItem.priority,
         memo: editItem.memo ?? '',
         repeat: editItem.repeat,
+        status: editItem.status ?? 'backlog',
+        difficulty: editItem.difficulty ?? '중',
+        estimated_minutes: editItem.estimated_minutes ?? 30,
+        is_divisible: editItem.is_divisible ?? false,
+        unit: editItem.unit ?? null,
+        total_units: editItem.total_units ?? null,
+        linked_event: editItem.linked_event ?? '',
       }
     }
     if (prefill) {
@@ -52,7 +62,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
         ...EMPTY_FORM,
         subject: prefill.subject ?? EMPTY_FORM.subject,
         dueDate: prefill.dueDate ?? todayStr(),
-        priority: 'high', // 전날 준비이므로 중요도 높게
+        priority: 'high',
       }
     }
     return { ...EMPTY_FORM, dueDate: todayStr() }
@@ -60,10 +70,14 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
 
   const [form, setForm] = useState(buildInitial)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
-  // isOpen이 바뀔 때마다 폼 초기화 (prefill 포함)
   useEffect(() => {
-    if (isOpen) setForm(buildInitial())
+    if (isOpen) {
+      setForm(buildInitial())
+      setShowAdvanced(false)
+      setShowDeleteConfirm(false)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
@@ -80,6 +94,10 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       ...form,
       memo: form.memo.trim() || null,
       linkedScheduleTitle: prefill?.sourceTitle ?? editItem?.linkedScheduleTitle ?? null,
+      linked_event: form.linked_event.trim() || null,
+      unit: form.is_divisible ? (Number(form.unit) || null) : null,
+      total_units: form.is_divisible ? (Number(form.total_units) || null) : null,
+      estimated_minutes: Number(form.estimated_minutes) || 30,
     }
     if (isEdit) {
       updateHomework(editItem.id, payload)
@@ -144,7 +162,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
           </div>
         </div>
 
-        {/* 마감일 + 우선순위 */}
+        {/* 마감일 + 중요도 */}
         <div className="flex gap-3">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-slate-600 mb-1">마감일 *</label>
@@ -169,18 +187,125 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
           </div>
         </div>
 
-        {/* 매일 반복 */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div
-            onClick={() => setForm(p => ({ ...p, repeat: !p.repeat }))}
-            className={`w-12 h-6 rounded-full transition-colors relative
-              ${form.repeat ? 'bg-indigo-500' : 'bg-slate-200'}`}
-          >
-            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
-              ${form.repeat ? 'translate-x-6' : 'translate-x-0.5'}`} />
+        {/* 난이도 + 소요시간 */}
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-slate-600 mb-1">난이도 (AI 배분용)</label>
+            <div className="flex gap-1.5">
+              {Object.entries(DIFFICULTY).map(([key, d]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setForm(p => ({ ...p, difficulty: key }))}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all
+                    ${form.difficulty === key
+                      ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 text-slate-500'
+                    }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <span className="text-sm font-medium text-slate-600">매일 반복</span>
-        </label>
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-slate-600 mb-1">소요시간(분)</label>
+            <input
+              type="number"
+              min="5"
+              max="180"
+              step="5"
+              value={form.estimated_minutes}
+              onChange={e => setForm(p => ({ ...p, estimated_minutes: e.target.value }))}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+          </div>
+        </div>
+
+        {/* 연결 학원 */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-600 mb-1">
+            연결 학원 <span className="text-slate-400 font-normal">(규칙 A·B: 전날 완료)</span>
+          </label>
+          <input
+            type="text"
+            value={form.linked_event}
+            onChange={e => setForm(p => ({ ...p, linked_event: e.target.value }))}
+            placeholder="예: 트윈클 픽션, 하윤네 수학"
+            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+        </div>
+
+        {/* 고급 옵션 토글 */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(v => !v)}
+          className="flex items-center gap-1.5 text-sm text-slate-400 font-medium w-fit"
+        >
+          {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          고급 옵션 (분할 배분·매일반복)
+        </button>
+
+        {showAdvanced && (
+          <div className="flex flex-col gap-4 pl-1 border-l-2 border-slate-100">
+            {/* 분할 가능 여부 */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setForm(p => ({ ...p, is_divisible: !p.is_divisible }))}
+                className={`w-12 h-6 rounded-full transition-colors relative
+                  ${form.is_divisible ? 'bg-indigo-500' : 'bg-slate-200'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                  ${form.is_divisible ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-slate-600">분할 배분 허용</span>
+                <p className="text-xs text-slate-400">여러 날에 나눠서 배치 가능</p>
+              </div>
+            </label>
+
+            {/* 분할 상세 */}
+            {form.is_divisible && (
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">1회 단위(분/개)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.unit ?? ''}
+                    onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
+                    placeholder="예: 10"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">총 단위 수</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.total_units ?? ''}
+                    onChange={e => setForm(p => ({ ...p, total_units: e.target.value }))}
+                    placeholder="예: 60"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 매일 반복 */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setForm(p => ({ ...p, repeat: !p.repeat }))}
+                className={`w-12 h-6 rounded-full transition-colors relative
+                  ${form.repeat ? 'bg-indigo-500' : 'bg-slate-200'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                  ${form.repeat ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </div>
+              <span className="text-sm font-medium text-slate-600">매일 반복</span>
+            </label>
+          </div>
+        )}
 
         {/* 메모 */}
         <div>
