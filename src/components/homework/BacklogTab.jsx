@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, School, BookOpen, Pencil, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, School, BookOpen, Pencil, Plus, Scissors } from 'lucide-react'
 import HomeworkFormModal from './HomeworkFormModal'
 import { HW_SUBJECTS, getDueDateLabel } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
@@ -42,7 +42,6 @@ function groupHeaderColor(items) {
 /** 단일 숙제 row — 컴팩트 인벤토리 스타일 */
 function BacklogItem({ item, onEdit }) {
   const subj = HW_SUBJECTS[item.subject] ?? HW_SUBJECTS.etc
-  const dueDateLabel = item.dueDate ? getDueDateLabel(item.dueDate) : null
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 bg-white rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
@@ -56,11 +55,21 @@ function BacklogItem({ item, onEdit }) {
         {item.title}
       </span>
 
-      {/* 마감일 */}
-      {dueDateLabel && (
+      {/* 소요시간 */}
+      {item.estimated_minutes && (
         <span className="text-xs text-slate-300 flex-shrink-0 hidden sm:block">
-          {dueDateLabel}
+          {item.estimated_minutes}분
         </span>
+      )}
+
+      {/* 분할 가능 배지 */}
+      {item.is_divisible && item.unit ? (
+        <span className="flex items-center gap-0.5 text-xs text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded-md flex-shrink-0">
+          <Scissors size={10} />
+          {item.unit}분
+        </span>
+      ) : (
+        <span className="text-xs text-slate-200 flex-shrink-0 hidden sm:block">통합</span>
       )}
 
       {/* 편집 버튼 */}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Trash2, CalendarClock, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trash2, CalendarClock, Scissors } from 'lucide-react'
 import Modal from '../common/Modal'
 import { HW_SUBJECTS, PRIORITY, DIFFICULTY } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
@@ -71,12 +71,10 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
 
   const [form, setForm] = useState(buildInitial)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setForm(buildInitial())
-      setShowAdvanced(false)
       setShowDeleteConfirm(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,67 +234,59 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
           />
         </div>
 
-        {/* 고급 옵션 토글 */}
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(v => !v)}
-          className="flex items-center gap-1.5 text-sm text-slate-400 font-medium w-fit"
-        >
-          {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          고급 옵션 (분할 배분·매일반복)
-        </button>
+        {/* 분할 배분 설정 (기본 노출) */}
+        <div className="bg-slate-50 rounded-2xl p-3 flex flex-col gap-3">
+          <p className="text-xs font-bold text-slate-500">AI 배분 옵션</p>
 
-        {showAdvanced && (
-          <div className="flex flex-col gap-4 pl-1 border-l-2 border-slate-100">
-            {/* 분할 가능 여부 */}
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => setForm(p => ({ ...p, is_divisible: !p.is_divisible }))}
-                className={`w-12 h-6 rounded-full transition-colors relative
-                  ${form.is_divisible ? 'bg-indigo-500' : 'bg-slate-200'}`}
-              >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
-                  ${form.is_divisible ? 'translate-x-6' : 'translate-x-0.5'}`} />
-              </div>
+          {/* 분할 가능 여부 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Scissors size={14} className="text-slate-400" />
               <div>
-                <span className="text-sm font-medium text-slate-600">분할 배분 허용</span>
-                <p className="text-xs text-slate-400">슬롯 부족 시 여러 날에 나눠서 배치 가능</p>
+                <span className="text-sm font-medium text-slate-600">분할 배분 가능</span>
+                <p className="text-xs text-slate-400">슬롯 부족 시 여러 날에 나눠서 배치</p>
               </div>
-            </label>
-
-            {/* 분할 상세: 최소 단위만 입력 */}
-            {form.is_divisible && (
-              <div className="flex-1">
-                <label className="block text-xs font-semibold text-slate-500 mb-1">
-                  최소 분할 단위 (분)
-                  <span className="ml-1 font-normal text-slate-400">— 한 번에 최소 이 만큼 진행</span>
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  step="5"
-                  value={form.unit ?? ''}
-                  onChange={e => setForm(p => ({ ...p, unit: e.target.value, total_units: form.estimated_minutes }))}
-                  placeholder="예: 40"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                />
-              </div>
-            )}
-
-            {/* 매일 반복 */}
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => setForm(p => ({ ...p, repeat: !p.repeat }))}
-                className={`w-12 h-6 rounded-full transition-colors relative
-                  ${form.repeat ? 'bg-indigo-500' : 'bg-slate-200'}`}
-              >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
-                  ${form.repeat ? 'translate-x-6' : 'translate-x-0.5'}`} />
-              </div>
-              <span className="text-sm font-medium text-slate-600">매일 반복</span>
-            </label>
+            </div>
+            <div
+              onClick={() => setForm(p => ({ ...p, is_divisible: !p.is_divisible, unit: null }))}
+              className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0
+                ${form.is_divisible ? 'bg-indigo-500' : 'bg-slate-200'}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                ${form.is_divisible ? 'translate-x-6' : 'translate-x-0.5'}`} />
+            </div>
           </div>
-        )}
+
+          {/* 분할 단위 */}
+          {form.is_divisible && (
+            <div className="flex items-center gap-3 pl-6">
+              <label className="text-xs text-slate-500 flex-shrink-0">1회 최소</label>
+              <input
+                type="number"
+                min="5"
+                step="5"
+                value={form.unit ?? ''}
+                onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
+                placeholder="예: 40"
+                className="w-24 border border-slate-200 rounded-xl px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              />
+              <label className="text-xs text-slate-500">분 단위로 분할</label>
+            </div>
+          )}
+
+          {/* 매일 반복 */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+            <span className="text-sm font-medium text-slate-600">매일 반복</span>
+            <div
+              onClick={() => setForm(p => ({ ...p, repeat: !p.repeat }))}
+              className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0
+                ${form.repeat ? 'bg-indigo-500' : 'bg-slate-200'}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                ${form.repeat ? 'translate-x-6' : 'translate-x-0.5'}`} />
+            </div>
+          </div>
+        </div>
 
         {/* 메모 */}
         <div>
