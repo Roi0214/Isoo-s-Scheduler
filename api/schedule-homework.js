@@ -127,8 +127,8 @@ async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
 
-  // v1beta + gemini-2.0-flash (1.5-flash 계열은 API에서 제공 안 됨 확인됨)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
+  // gemini-2.0-flash-lite: 무료 티어 지원 모델
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -205,84 +205,38 @@ function buildPrompt(homeworks, schedules, googleEvents, weekDates) {
     .map(([title, dates]) => `  - "${title}": 수업일 = ${dates.join(', ')}`)
     .join('\n')
 
-  // 숙제 목록
+  // 숙제 목록 (토큰 절약을 위해 간결하게 직렬화)
   const homeworkLines = homeworks
     .filter(hw => hw.status !== 'completed')
     .map((hw, i) => {
-      const divisible = hw.is_divisible
-        ? `분할가능(1회단위=${hw.unit ?? '?'}, 총단위=${hw.total_units ?? '?'})`
-        : '분할불가'
-      const linked = hw.linked_event ? `연결학원="${hw.linked_event}"` : '연결학원없음'
-      return `${i + 1}. id="${hw.id}" 제목="${hw.title}" 과목=${hw.subject} 난이도=${hw.difficulty} 소요=${hw.estimated_minutes}분 ${divisible} ${linked} 마감=${hw.dueDate}`
+      const div = hw.is_divisible ? `div(unit=${hw.unit},total=${hw.total_units})` : 'nodiv'
+      const lnk = hw.linked_event ? `lnk=${hw.linked_event}` : ''
+      return `${i + 1}|${hw.id}|${hw.title}|${hw.subject}|난이도${hw.difficulty}|${hw.estimated_minutes}min|${div}|${lnk}|due=${hw.dueDate}`
     })
     .join('\n')
 
-  return `[중요] 반드시 순수한 JSON 문자열로만 응답하세요. \`\`\`json 같은 마크다운 코드 블록, 설명 텍스트, 주석을 절대 포함하지 마세요. 응답의 첫 글자는 반드시 { 이어야 합니다.
+  return `JSON만 출력. 마크다운 블록 금지. 첫 글자 반드시 {
 
-당신은 초등학생(이수, 9세)의 주간 숙제 스케줄러입니다.
-아래 정보를 바탕으로 이번 주(${weekDates[0]} ~ ${weekDates[6]}) 숙제를 배분하세요.
+초등학생(9세) 주간 숙제 배분. 주: ${weekDates[0]}~${weekDates[6]}
 
-=== 학원 수업 날짜 정보 ===
+[학원 수업일]
 ${linkedEventSummary || '없음'}
 
-=== 날짜별 가용 시간 슬롯 ===
+[가용 슬롯]
 ${daySlotLines}
 
-=== 배분할 숙제 목록 ===
-${homeworkLines || '배분할 숙제 없음'}
+[숙제목록] 형식: 번호|id|제목|과목|난이도|소요|분할|연결학원|마감
+${homeworkLines || '없음'}
 
-=== 배분 규칙 (반드시 준수) ===
+[규칙]
+A: linked_event 있으면 학원 당일(D) 제외, D-1까지 완료
+B: "보카복습"/"보카2차" 포함 숙제는 학원D-1 당일에만 배치(앞당기기 금지)
+C: div 숙제는 unit 단위로 쪼개 분산. blocks에 units_today 기재
+D: 난이도상 → 평일19-21시/주말09-14시 우선. 중·하는 남은슬롯 자유
+E: 소프트22:00전, 하드22:30후 절대금지. 초과분 다음날/주말 이월→unscheduled
 
-[규칙 A] 전날 완료 원칙:
-연결학원(linked_event)이 있는 숙제는 해당 학원 수업일의 전날(D-1) 이전에 반드시 완료되도록 배치하세요.
-즉, 학원 당일에는 해당 숙제를 배정하지 마세요.
-
-[규칙 B] 보카 복습 특수 규칙:
-제목에 "보카 복습" 또는 "보카 2차"가 포함된 숙제는 절대로 앞당기지 말고,
-연결 학원일의 정확히 하루 전날(D-1)에만 배치하세요.
-
-[규칙 C] 분할 배분:
-is_divisible(분할가능)인 숙제는 unit(1회 단위) 크기로 쪼개어 여러 날에 분산 배치하세요.
-각 블록에 units_today 필드로 당일 단위 수를 명시하세요.
-
-[규칙 D] 난이도별 최적 시간대:
-- 난이도 "상":
-  * 평일 → 저녁 식사 후 19:00~21:00 사이 빈슬롯에 최우선 배치
-  * 주말 → 오전~낮 시간(09:00~14:00) 빈슬롯에 최우선 배치
-- 난이도 "중"/"하": 남은 빈슬롯에 자유롭게 배치
-
-[규칙 E] 수면 시간 확보 (마감 규칙):
-- Soft 마감: 가능하면 모든 숙제를 22:00 이전에 종료되도록 배치
-- Hard 마감: 어떤 경우에도 22:30 이후에는 절대 숙제를 배정하지 마세요.
-  시간이 부족하면 해당 숙제를 다음 날 또는 주말로 이월하고 unscheduled에 기록하세요.
-
-[추가 규칙]
-- 한 슬롯 안에 여러 숙제를 배치할 경우 시작/종료 시간이 겹치지 않도록 하세요.
-- 배분 불가한 숙제는 반드시 unscheduled 배열에 이유와 함께 포함하세요.
-- 모든 시간은 24시간제 HH:MM 형식을 사용하세요.
-
-=== 출력 형식 (순수 JSON만 출력, 주석 없음) ===
-{
-  "blocks": [
-    {
-      "homework_id": "hw-xxx",
-      "homework_title": "숙제 제목",
-      "subject": "math",
-      "date": "YYYY-MM-DD",
-      "start_time": "HH:MM",
-      "end_time": "HH:MM",
-      "units_today": null,
-      "reason": "배치 이유 (한국어, 30자 이내)"
-    }
-  ],
-  "unscheduled": [
-    {
-      "homework_id": "hw-xxx",
-      "homework_title": "숙제 제목",
-      "reason": "미배분 이유"
-    }
-  ]
-}`
+[출력 JSON 스키마]
+{"blocks":[{"homework_id":"","homework_title":"","subject":"","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","units_today":null,"reason":""}],"unscheduled":[{"homework_id":"","homework_title":"","reason":""}]}`
 }
 
 // ── 메인 핸들러 ──────────────────────────────────────────────
