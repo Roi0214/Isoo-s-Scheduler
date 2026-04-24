@@ -127,12 +127,12 @@ async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
 
+  // v1 엔드포인트 사용 (responseMimeType은 v1beta 전용이므로 제거)
   const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
-      responseMimeType: 'application/json',
       temperature: 0.2,
       maxOutputTokens: 4096,
     },
@@ -150,10 +150,20 @@ async function callGemini(prompt) {
   }
 
   const data = await res.json()
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('Gemini 응답이 비어 있습니다.')
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!raw) throw new Error('Gemini 응답이 비어 있습니다.')
 
-  return JSON.parse(text)
+  // 마크다운 코드 블록(```json ... ```) 안전 제거 후 파싱
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    throw new Error(`Gemini 응답 JSON 파싱 실패:\n${cleaned.slice(0, 200)}`)
+  }
 }
 
 // ── 프롬프트 빌더 ────────────────────────────────────────────
@@ -206,7 +216,9 @@ function buildPrompt(homeworks, schedules, googleEvents, weekDates) {
     })
     .join('\n')
 
-  return `당신은 초등학생(이수, 9세)의 주간 숙제 스케줄러입니다.
+  return `[중요] 반드시 순수한 JSON 문자열로만 응답하세요. \`\`\`json 같은 마크다운 코드 블록, 설명 텍스트, 주석을 절대 포함하지 마세요. 응답의 첫 글자는 반드시 { 이어야 합니다.
+
+당신은 초등학생(이수, 9세)의 주간 숙제 스케줄러입니다.
 아래 정보를 바탕으로 이번 주(${weekDates[0]} ~ ${weekDates[6]}) 숙제를 배분하세요.
 
 === 학원 수업 날짜 정보 ===
