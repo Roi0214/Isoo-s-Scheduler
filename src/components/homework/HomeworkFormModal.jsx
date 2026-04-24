@@ -63,6 +63,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
         subject: prefill.subject ?? EMPTY_FORM.subject,
         dueDate: prefill.dueDate ?? todayStr(),
         priority: 'high',
+        linked_event: prefill.linked_event ?? '',
       }
     }
     return { ...EMPTY_FORM, dueDate: todayStr() }
@@ -96,7 +97,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       linkedScheduleTitle: prefill?.sourceTitle ?? editItem?.linkedScheduleTitle ?? null,
       linked_event: form.linked_event.trim() || null,
       unit: form.is_divisible ? (Number(form.unit) || null) : null,
-      total_units: form.is_divisible ? (Number(form.total_units) || null) : null,
+      total_units: form.is_divisible ? (Number(form.estimated_minutes) || null) : null,
       estimated_minutes: Number(form.estimated_minutes) || 30,
     }
     if (isEdit) {
@@ -209,11 +210,10 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
             </div>
           </div>
           <div className="flex-1">
-            <label className="block text-sm font-semibold text-slate-600 mb-1">소요시간(분)</label>
+            <label className="block text-sm font-semibold text-slate-600 mb-1">총 소요시간(분)</label>
             <input
               type="number"
               min="5"
-              max="180"
               step="5"
               value={form.estimated_minutes}
               onChange={e => setForm(p => ({ ...p, estimated_minutes: e.target.value }))}
@@ -260,35 +260,26 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
               </div>
               <div>
                 <span className="text-sm font-medium text-slate-600">분할 배분 허용</span>
-                <p className="text-xs text-slate-400">여러 날에 나눠서 배치 가능</p>
+                <p className="text-xs text-slate-400">슬롯 부족 시 여러 날에 나눠서 배치 가능</p>
               </div>
             </label>
 
-            {/* 분할 상세 */}
+            {/* 분할 상세: 최소 단위만 입력 */}
             {form.is_divisible && (
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">1회 단위(분/개)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.unit ?? ''}
-                    onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
-                    placeholder="예: 10"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">총 단위 수</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.total_units ?? ''}
-                    onChange={e => setForm(p => ({ ...p, total_units: e.target.value }))}
-                    placeholder="예: 60"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                  최소 분할 단위 (분)
+                  <span className="ml-1 font-normal text-slate-400">— 한 번에 최소 이 만큼 진행</span>
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  value={form.unit ?? ''}
+                  onChange={e => setForm(p => ({ ...p, unit: e.target.value, total_units: form.estimated_minutes }))}
+                  placeholder="예: 40"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
               </div>
             )}
 

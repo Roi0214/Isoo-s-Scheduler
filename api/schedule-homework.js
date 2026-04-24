@@ -235,7 +235,7 @@ ${homeworkLines || '없음'}
 [규칙]
 A: linked_event 있으면 학원 당일(D) 제외, D-1까지 완료
 B: "보카복습"/"보카2차" 포함 숙제는 학원D-1 당일에만 배치(앞당기기 금지)
-C: div 숙제는 unit 단위로 쪼개 분산. blocks에 units_today 기재
+C: div 숙제는 한 슬롯에 전체를 넣을 수 있으면 통으로 배치. 슬롯이 부족할 때만 unit 단위로 분할. units_today에 해당 세션 분량 기재
 D: 난이도상 → 평일19-21시/주말09-14시 우선. 중·하는 남은슬롯 자유
 E: 소프트22:00전, 하드22:30후 절대금지. 초과분 다음날/주말 이월→unscheduled
 F: priority=low 숙제(연산,단원평가,비문학 등)는 high·medium 완료 후 여유슬롯에만 배치. 슬롯 부족 시 전부 unscheduled 처리해도 됨
