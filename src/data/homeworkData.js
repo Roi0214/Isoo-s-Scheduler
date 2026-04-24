@@ -285,9 +285,25 @@ export const HOMEWORKS = [
 ]
 
 /**
- * 기존 localStorage 데이터에 신규 필드가 없을 경우 기본값으로 채워주는 마이그레이션
+ * linkedScheduleTitle에서 학원명만 추출
+ * "하윤네 수학 (월) 숙제" → "하윤네 수학"
+ * "트윈클 픽션 (목) 숙제" → "트윈클 픽션"
+ * null/undefined → null
+ */
+function extractAcademyName(title) {
+  if (!title) return null
+  // " (월) 숙제", " (화) 숙제" 등 요일 + 숙제 접미사 제거
+  return title.replace(/\s*\([월화수목금토일]\)\s*숙제?$/, '').trim() || null
+}
+
+/**
+ * localStorage 기존 데이터에 신규 필드 보완 + linked_event 정규화
+ * - 이미 잘못 저장된 "하윤네 수학 (월) 숙제" 형태도 "하윤네 수학"으로 교정
  */
 export function migrateHomework(hw) {
+  // linkedScheduleTitle 기반으로 학원명 추출 (항상 재계산해서 교정)
+  const extractedAcademy = extractAcademyName(hw.linkedScheduleTitle)
+
   return {
     status: 'backlog',
     difficulty: '중',
@@ -295,8 +311,9 @@ export function migrateHomework(hw) {
     is_divisible: false,
     unit: null,
     total_units: null,
-    linked_event: hw.linkedScheduleTitle ?? null,
     ...hw,
+    // linked_event: 이미 올바른 값이 있으면 유지, 없거나 요일 포함된 잘못된 값이면 교정
+    linked_event: extractedAcademy ?? hw.linked_event ?? null,
   }
 }
 
