@@ -56,8 +56,42 @@ export default function TodayAITab() {
 
   const scheduledDates = Object.keys(blocksByDate).sort()
 
+  // 생성 중
+  if (isGenerating) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center animate-pulse">
+          <Sparkles size={26} className="text-indigo-500" />
+        </div>
+        <p className="text-sm font-semibold text-slate-600">AI가 최적 시간표를 계산하는 중...</p>
+        <p className="text-xs text-slate-400">5대 규칙 분석 중, 잠시만 기다려 주세요</p>
+      </div>
+    )
+  }
+
+  // 오류 (aiSchedule이 없고 에러가 있을 때 — 미생성 화면보다 먼저 체크)
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+          <AlertTriangle size={22} className="text-red-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-bold text-red-600 mb-1">배분 생성 실패</p>
+          <p className="text-xs text-slate-400 leading-relaxed max-w-xs">{error}</p>
+        </div>
+        <button
+          onClick={handleGenerate}
+          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm"
+        >
+          <RefreshCw size={14} /> 다시 시도
+        </button>
+      </div>
+    )
+  }
+
   // 미생성 상태
-  if (!aiSchedule && !isGenerating) {
+  if (!aiSchedule) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-5">
         <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center">
@@ -81,40 +115,6 @@ export default function TodayAITab() {
           Gemini 1.5 Flash · 5대 규칙 적용<br />
           (전날 완료·보카 복습·분할·난이도·수면 보호)
         </div>
-      </div>
-    )
-  }
-
-  // 생성 중
-  if (isGenerating) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center animate-pulse">
-          <Sparkles size={26} className="text-indigo-500" />
-        </div>
-        <p className="text-sm font-semibold text-slate-600">AI가 최적 시간표를 계산하는 중...</p>
-        <p className="text-xs text-slate-400">5대 규칙 분석 중, 잠시만 기다려 주세요</p>
-      </div>
-    )
-  }
-
-  // 오류
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
-          <AlertTriangle size={22} className="text-red-400" />
-        </div>
-        <div className="text-center">
-          <p className="text-sm font-bold text-red-600 mb-1">배분 생성 실패</p>
-          <p className="text-xs text-slate-400 leading-relaxed max-w-xs">{error}</p>
-        </div>
-        <button
-          onClick={handleGenerate}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm"
-        >
-          <RefreshCw size={14} /> 다시 시도
-        </button>
       </div>
     )
   }
