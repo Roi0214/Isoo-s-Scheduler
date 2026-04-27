@@ -18,7 +18,7 @@ export default function TodayAITab() {
   const {
     aiSchedule, isGenerating, error,
     generateSchedule, loadDummySchedule, clearError, clearSchedule,
-    rolloverPastBlocks,
+    redistributeIncomplete,
   } = useAISchedule()
   const { homeworks, isCompleted } = useHomework()
   const { schedules } = useSchedule()
@@ -43,7 +43,7 @@ export default function TodayAITab() {
   ) ?? []
 
   const handleRollover = () => {
-    const count = rolloverPastBlocks(today, isCompleted)
+    const count = redistributeIncomplete(today, isCompleted, homeworks)
     if (count > 0) setRolledOver(true)
   }
 
@@ -222,10 +222,13 @@ export default function TodayAITab() {
               onClick={handleRollover}
               className="text-xs font-bold text-orange-600 bg-orange-100 px-3 py-1.5 rounded-xl active:bg-orange-200"
             >
-              오늘로 옮기기
+              남은 날짜에 재배분
             </button>
           </div>
-          <div className="mt-2 flex flex-col gap-1">
+          <p className="text-xs text-orange-400 mt-1">
+            중요·보통은 남은 날짜에 분산 · 여유 숙제는 다음 주로 이월
+          </p>
+          <div className="mt-1.5 flex flex-col gap-0.5">
             {pastIncomplete.map(b => (
               <p key={b.homework_id} className="text-xs text-orange-500 truncate pl-1">
                 · {b.homework_title}
@@ -238,7 +241,7 @@ export default function TodayAITab() {
 
       {rolledOver && pastIncomplete.length === 0 && (
         <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-3 py-2 mb-3 text-xs text-indigo-500 font-medium">
-          ↩ 밀린 숙제를 오늘 일정에 추가했어요
+          ↩ 밀린 숙제를 남은 날짜에 재배분했어요
         </div>
       )}
 

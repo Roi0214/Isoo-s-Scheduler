@@ -149,11 +149,17 @@ export function AIScheduleProvider({ children }) {
       const data = await response.json()
       console.log(`[AISchedule] ✅ Gemini API 완료 — blocks: ${data.blocks?.length ?? 0}`)
 
+      const blocks = data.blocks ?? []
+      const scheduledIds = new Set(blocks.map(b => b.homework_id))
+      const unscheduled = (data.unscheduled ?? []).filter(
+        u => !scheduledIds.has(u.homework_id)
+      )
+
       setAiSchedule({
         week_start: weekStart,
         generated_at: new Date().toISOString(),
-        blocks: data.blocks ?? [],
-        unscheduled: data.unscheduled ?? [],
+        blocks,
+        unscheduled,
       })
     } catch (err) {
       console.error('[AISchedule] ❌ 실패:', err.message)
@@ -171,25 +177,101 @@ export function AIScheduleProvider({ children }) {
   }, [aiSchedule])
 
   /**
-   * 오늘 이전 날짜 중 미완료 블록을 오늘로 이동
-   * @param {string} today - 'YYYY-MM-DD'
-   * @param {(id: string) => boolean} isCompletedFn - HomeworkContext의 isCompleted
-   * @returns {number} 롤오버된 항목 수
+   * 미완료 과거 블록을 남은 주간에 재배분
+   * - 고/중 우선순위: 남은 날짜에 분산 배치 (dueDate 존중)
+   * - 저 우선순위: 이번 주 마감 초과 시 unscheduled로 이동
    */
-  const rolloverPastBlocks = useCallback((today, isCompletedFn) => {
+  const redistributeIncomplete = useCallback((today, isCompletedFn, homeworks) => {
     if (!aiSchedule) return 0
-    let count = 0
+
+    const hwMap = Object.fromEntries((homeworks || []).map(h => [h.id, h]))
+
+    // 이번 주 남은 날짜 (오늘 포함 ~ 일요일)
+    const todayObj = new Date(today + 'T00:00:00')
+    const dayOfWeek = todayObj.getDay()
+    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek
+    const remainingDays = []
+    for (let i = 0; i <= daysUntilSunday; i++) {
+      const d = new Date(todayObj)
+      d.setDate(todayObj.getDate() + i)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      remainingDays.push(`${y}-${m}-${dd}`)
+    }
+
+    // 미완료 과거 블록 (이미 재배분된 것 제외)
+    const incompletePast = aiSchedule.blocks.filter(
+      b => b.date < today && !isCompletedFn(b.homework_id) && !b.rolledOver
+    )
+    if (incompletePast.length === 0) return 0
+
+    const highMed = incompletePast.filter(b => (hwMap[b.homework_id]?.priority ?? 'medium') !== 'low')
+    const low = incompletePast.filter(b => hwMap[b.homework_id]?.priority === 'low')
+
+    // 고/중 우선순위 → 남은 날짜에 순서대로 분산
+    let dayIdx = 0
+    const redistributed = highMed.map(block => {
+      const hw = hwMap[block.homework_id]
+      // dueDate가 있으면 그 이전 날들만 대상
+      let validDays = remainingDays
+      if (hw?.dueDate && hw.dueDate <= remainingDays[remainingDays.length - 1]) {
+        validDays = remainingDays.filter(d => d <= hw.dueDate)
+      }
+      if (validDays.length === 0) validDays = [today]
+      const targetDay = validDays[dayIdx % validDays.length]
+      dayIdx++
+      return { ...block, date: targetDay, rolledOver: true, originalDate: block.date }
+    })
+
+    // 저 우선순위 → unscheduled 이동
+    const newUnscheduled = low.map(b => ({
+      homework_id: b.homework_id,
+      homework_title: b.homework_title,
+      reason: '우선순위 낮음 — 주간 마감 초과, 다음 주로 이월',
+    }))
+
     setAiSchedule(prev => ({
       ...prev,
-      blocks: prev.blocks.map(block => {
-        if (block.date < today && !isCompletedFn(block.homework_id) && !block.rolledOver) {
-          count++
-          return { ...block, date: today, rolledOver: true, originalDate: block.date }
-        }
-        return block
-      }),
+      blocks: [
+        // 완료된 과거 블록 + 오늘 이후 블록은 유지, 미완료 과거는 제거
+        ...prev.blocks.filter(b =>
+          b.date >= today || isCompletedFn(b.homework_id) || b.rolledOver
+        ),
+        ...redistributed,
+      ],
+      unscheduled: [
+        ...(prev.unscheduled || []).filter(
+          u => !low.some(b => b.homework_id === u.homework_id)
+        ),
+        ...newUnscheduled,
+      ],
     }))
-    return count
+
+    return incompletePast.length
+  }, [aiSchedule])
+
+  /** 숙제 삭제 시 AI 스케줄에서 해당 블록 제거 */
+  const removeBlocksByHomeworkId = useCallback((hwId) => {
+    if (!aiSchedule) return
+    setAiSchedule(prev => ({
+      ...prev,
+      blocks: prev.blocks.filter(b => b.homework_id !== hwId),
+      unscheduled: (prev.unscheduled || []).filter(u => u.homework_id !== hwId),
+    }))
+  }, [aiSchedule])
+
+  /** 숙제 수정 시 AI 스케줄의 제목/과목 동기화 */
+  const syncUpdatedHomework = useCallback((hw) => {
+    if (!aiSchedule) return
+    setAiSchedule(prev => ({
+      ...prev,
+      blocks: prev.blocks.map(b =>
+        b.homework_id === hw.id
+          ? { ...b, homework_title: hw.title, subject: hw.subject }
+          : b
+      ),
+    }))
   }, [aiSchedule])
 
   return (
@@ -202,7 +284,9 @@ export function AIScheduleProvider({ children }) {
       clearError,
       clearSchedule,
       getBlocksForDate,
-      rolloverPastBlocks,
+      redistributeIncomplete,
+      removeBlocksByHomeworkId,
+      syncUpdatedHomework,
     }}>
       {children}
     </AIScheduleContext.Provider>
