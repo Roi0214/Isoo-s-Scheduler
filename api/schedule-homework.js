@@ -311,6 +311,25 @@ ${customRulesText || DEFAULT_RULES_TEXT}
 {"blocks":[{"homework_id":"","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","units_today":null}],"unscheduled":[{"homework_id":"","reason":""}]}`
 }
 
+// ── 날짜 규칙 검증 (fixed_d1 · linked_event) ─────────────────
+function isBlockDateValid(block, hw, linkedEventMap) {
+  if (!hw) return true
+
+  // fixed_d1: 반드시 dueDate 당일에만 배치
+  if (hw.fixed_d1 && hw.dueDate && block.date !== hw.dueDate) {
+    return false
+  }
+
+  // linked_event: 학원 당일(D)에는 배치 불가
+  if (hw.linked_event && linkedEventMap[hw.linked_event]) {
+    if (linkedEventMap[hw.linked_event].includes(block.date)) {
+      return false
+    }
+  }
+
+  return true
+}
+
 // ── 블록 유효성 검증 ─────────────────────────────────────────
 /**
  * AI가 생성한 블록이 학원·식사 시간과 겹치거나
@@ -429,12 +448,22 @@ export default async function handler(req, res) {
       subject:        hwMap[b.homework_id]?.subject || 'etc',
     }))
 
-    // ── 사후 검증: 학원·식사 시간과 겹치거나 범위 밖 블록 제거 ──
-    const validBlocks   = enrichedBlocks.filter(b => isBlockValid(b, schedules, googleEvents || []))
-    const invalidBlocks = enrichedBlocks.filter(b => !isBlockValid(b, schedules, googleEvents || []))
-    if (invalidBlocks.length > 0) {
-      console.warn('[schedule-homework] ⚠️ 유효하지 않은 블록 제거:', invalidBlocks.length)
+    // ── 사후 검증 1: 시간 범위·충돌 ───────────────────────────
+    const timeValidBlocks   = enrichedBlocks.filter(b => isBlockValid(b, schedules, googleEvents || []))
+    const timeInvalidBlocks = enrichedBlocks.filter(b => !isBlockValid(b, schedules, googleEvents || []))
+    if (timeInvalidBlocks.length > 0) {
+      console.warn('[schedule-homework] ⚠️ 시간 충돌 블록 제거:', timeInvalidBlocks.length)
     }
+
+    // ── 사후 검증 2: 날짜 규칙 (fixed_d1·linked_event) ────────
+    const ruleLinkedMap = buildLinkedEventMap(schedules, weekDates)
+    const validBlocks   = timeValidBlocks.filter(b => isBlockDateValid(b, hwMap[b.homework_id], ruleLinkedMap))
+    const dateInvalidBlocks = timeValidBlocks.filter(b => !isBlockDateValid(b, hwMap[b.homework_id], ruleLinkedMap))
+    if (dateInvalidBlocks.length > 0) {
+      console.warn('[schedule-homework] ⚠️ 날짜 규칙 위반 블록 제거:', dateInvalidBlocks.length)
+    }
+
+    const invalidBlocks = [...timeInvalidBlocks, ...dateInvalidBlocks]
 
     // 유효하지 않아 제거된 블록 중 다른 날짜에 배치된 것도 없으면 unscheduled로 이동
     const scheduledIds = new Set(validBlocks.map(b => b.homework_id))
