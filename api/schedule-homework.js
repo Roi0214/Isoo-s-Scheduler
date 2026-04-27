@@ -221,7 +221,7 @@ async function callAI(prompt) {
     console.log('[schedule-homework] ✅ Groq 성공')
     return { result, provider: 'groq' }
   } catch (err) {
-    if (err.status === 429 && process.env.GEMINI_API_KEY) {
+    if ((err.status === 429 || err.status === 413) && process.env.GEMINI_API_KEY) {
       console.warn('[schedule-homework] ⚠️ Groq 429 한도 초과 — Gemini로 폴백')
       const result = await callGemini(prompt)
       console.log('[schedule-homework] ✅ Gemini 폴백 성공')
