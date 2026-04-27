@@ -247,7 +247,7 @@ ${homeworkLines || '없음'}
 ${customRulesText || DEFAULT_RULES_TEXT}
 
 [출력 JSON 스키마]
-{"blocks":[{"homework_id":"","homework_title":"","subject":"","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","units_today":null,"reason":""}],"unscheduled":[{"homework_id":"","homework_title":"","reason":""}]}`
+{"blocks":[{"homework_id":"","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","units_today":null}],"unscheduled":[{"homework_id":"","reason":""}]}`
 }
 
 // ── 블록 유효성 검증 ─────────────────────────────────────────
@@ -360,11 +360,12 @@ export default async function handler(req, res) {
     const blocks = Array.isArray(result.blocks) ? result.blocks : []
     const unscheduled = Array.isArray(result.unscheduled) ? result.unscheduled : []
 
-    // subject 필드 보완 (AI가 누락할 경우 homeworks에서 찾아서 채움)
+    // homework_title·subject는 AI 출력에서 제거했으므로 서버에서 보완
     const hwMap = Object.fromEntries(backlog.map(h => [h.id, h]))
     const enrichedBlocks = blocks.map(b => ({
       ...b,
-      subject: b.subject || hwMap[b.homework_id]?.subject || 'etc',
+      homework_title: hwMap[b.homework_id]?.title || b.homework_id,
+      subject:        hwMap[b.homework_id]?.subject || 'etc',
     }))
 
     // ── 사후 검증: 학원·식사 시간과 겹치거나 범위 밖 블록 제거 ──
@@ -380,7 +381,7 @@ export default async function handler(req, res) {
       .filter(b => !scheduledIds.has(b.homework_id))
       .map(b => ({
         homework_id:    b.homework_id,
-        homework_title: b.homework_title,
+        homework_title: hwMap[b.homework_id]?.title || b.homework_id,
         reason: '학원·식사 시간과 겹쳐 자동 제거됨 — 재생성 필요',
       }))
 
@@ -393,7 +394,13 @@ export default async function handler(req, res) {
     }
 
     // 이미 validBlocks에 있는 것은 unscheduled에서 제거
-    const finalUnscheduled = allUnscheduled.filter(u => !scheduledIds.has(u.homework_id))
+    // homework_title 보완 (AI 출력에서 제거됐으므로 서버에서 채움)
+    const finalUnscheduled = allUnscheduled
+      .filter(u => !scheduledIds.has(u.homework_id))
+      .map(u => ({
+        ...u,
+        homework_title: u.homework_title || hwMap[u.homework_id]?.title || u.homework_id,
+      }))
 
     return res.status(200).json({ blocks: validBlocks, unscheduled: finalUnscheduled })
   } catch (err) {
