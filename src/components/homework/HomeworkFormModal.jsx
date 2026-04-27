@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Trash2, CalendarClock, Scissors, Wand2 } from 'lucide-react'
 import Modal from '../common/Modal'
 import { HW_SUBJECTS, PRIORITY, DIFFICULTY } from '../../data/homeworkData'
@@ -76,6 +76,16 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
   const { removeBlocksByHomeworkId, syncUpdatedHomework } = useAISchedule()
   const { schedules } = useSchedule()
   const isEdit = !!editItem
+
+  // 학원 선택지: mission·school 카테고리 제외, 중복 제거, 가나다 정렬
+  const academyOptions = useMemo(() => {
+    const seen = new Set()
+    return schedules
+      .filter(s => s.category !== 'mission' && s.category !== 'school')
+      .map(s => s.title)
+      .filter(t => { if (seen.has(t)) return false; seen.add(t); return true })
+      .sort((a, b) => a.localeCompare(b, 'ko'))
+  }, [schedules])
   const [autoDateLabel, setAutoDateLabel] = useState(null) // 자동 설정된 학원 이름
 
   const buildInitial = () => {
@@ -151,7 +161,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       dueDate: form.repeat ? null : form.dueDate,
       memo: form.memo.trim() || null,
       linkedScheduleTitle: prefill?.sourceTitle ?? editItem?.linkedScheduleTitle ?? null,
-      linked_event: form.linked_event.trim() || null,
+      linked_event: (form.linked_event === '__custom__' ? '' : form.linked_event).trim() || null,
       unit: form.is_divisible ? (Number(form.unit) || null) : null,
       total_units: form.is_divisible ? (Number(form.estimated_minutes) || null) : null,
       estimated_minutes: Number(form.estimated_minutes) || 30,
@@ -299,15 +309,42 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
         <div className="flex flex-col gap-2">
           <div>
             <label className="block text-sm font-semibold text-slate-600 mb-1">연결 학원</label>
-            <input
-              type="text"
-              value={form.linked_event}
-              onChange={e => setForm(p => ({ ...p, linked_event: e.target.value }))}
-              placeholder="예: 트윈클, 하윤네 수학"
-              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
+            <select
+              value={
+                !form.linked_event?.trim() ? ''
+                : academyOptions.includes(form.linked_event.trim()) ? form.linked_event.trim()
+                : '__custom__'
+              }
+              onChange={e => {
+                if (e.target.value === '__custom__') {
+                  setForm(p => ({ ...p, linked_event: '__custom__' }))
+                } else {
+                  setForm(p => ({ ...p, linked_event: e.target.value, fixed_d1: false }))
+                }
+              }}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+            >
+              <option value="">선택 안 함</option>
+              {academyOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+              <option value="__custom__">기타 (직접 입력)</option>
+            </select>
+            {/* 기타 선택 시 직접 입력 */}
+            {(form.linked_event === '__custom__' ||
+              (!academyOptions.includes(form.linked_event?.trim() ?? '') && form.linked_event?.trim())
+            ) && (
+              <input
+                type="text"
+                value={form.linked_event === '__custom__' ? '' : form.linked_event}
+                onChange={e => setForm(p => ({ ...p, linked_event: e.target.value }))}
+                placeholder="학원 이름 직접 입력"
+                autoFocus
+                className="mt-2 w-full border border-indigo-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            )}
           </div>
-          {form.linked_event?.trim() && (
+          {form.linked_event?.trim() && form.linked_event !== '__custom__' && (
             <div className="flex items-center justify-between pl-1">
               <div>
                 <span className="text-sm font-medium text-slate-600">전날 고정 (D-1)</span>
