@@ -1,5 +1,6 @@
 import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical, RotateCcw } from 'lucide-react'
 import AIHomeworkBlock from './AIHomeworkBlock'
+import HomeworkFormModal from './HomeworkFormModal'
 import { useAISchedule } from '../../context/AIScheduleContext'
 import { useHomework } from '../../context/HomeworkContext'
 import { useSchedule } from '../../context/ScheduleContext'
@@ -25,6 +26,7 @@ export default function TodayAITab() {
   const { getEventsForDate } = useGCal()
   const [expandedDays, setExpandedDays] = useState({})
   const [rolledOver, setRolledOver] = useState(false)
+  const [editHw, setEditHw] = useState(null)
 
   const now = new Date()
   const today = localDateStr(now)
@@ -294,7 +296,11 @@ export default function TodayAITab() {
               {isOpen && (
                 <div className="flex flex-col gap-2">
                   {blocks.map((block, idx) => (
-                    <AIHomeworkBlock key={`${block.homework_id}-${idx}`} block={block} />
+                    <AIHomeworkBlock
+                      key={`${block.homework_id}-${idx}`}
+                      block={block}
+                      onEdit={setEditHw}
+                    />
                   ))}
                 </div>
               )}
@@ -302,6 +308,12 @@ export default function TodayAITab() {
           )
         })
       )}
+
+      <HomeworkFormModal
+        isOpen={!!editHw}
+        onClose={() => setEditHw(null)}
+        editItem={editHw}
+      />
     </div>
   )
 }

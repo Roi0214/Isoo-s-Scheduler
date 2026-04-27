@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, Circle, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { HW_SUBJECTS, DIFFICULTY } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
@@ -17,7 +17,7 @@ const SUBJECT_COLORS = {
  * AI가 배분한 단일 숙제 블록 카드
  * @param {{ block: AIScheduledBlock }} props
  */
-export default function AIHomeworkBlock({ block }) {
+export default function AIHomeworkBlock({ block, onEdit }) {
   const { isCompleted, toggleCompleted, homeworks } = useHomework()
   const [expanded, setExpanded] = useState(false)
 
@@ -118,6 +118,14 @@ export default function AIHomeworkBlock({ block }) {
             <p className="text-xs text-slate-500 bg-white rounded-lg px-3 py-2">
               {hw.memo}
             </p>
+          )}
+          {onEdit && hw && (
+            <button
+              onClick={() => onEdit(hw)}
+              className="self-start flex items-center gap-1 text-xs text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-lg font-medium mt-0.5 active:bg-indigo-100"
+            >
+              <Pencil size={11} /> 숙제 수정
+            </button>
           )}
         </div>
       )}
