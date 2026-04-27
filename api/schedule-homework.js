@@ -178,7 +178,7 @@ async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -214,21 +214,22 @@ async function callGemini(prompt) {
   }
 }
 
-// ── AI 호출 (Groq → Gemini 폴백) ─────────────────────────────
+// ── AI 호출 (Gemini 주 → Groq 폴백) ─────────────────────────
 async function callAI(prompt) {
-  try {
-    const result = await callGroq(prompt)
-    console.log('[schedule-homework] ✅ Groq 성공')
-    return { result, provider: 'groq' }
-  } catch (err) {
-    if ((err.status === 429 || err.status === 413) && process.env.GEMINI_API_KEY) {
-      console.warn('[schedule-homework] ⚠️ Groq 429 한도 초과 — Gemini로 폴백')
+  // Gemini 주 모델 (규칙 준수 우수, 100만 TPD)
+  if (process.env.GEMINI_API_KEY) {
+    try {
       const result = await callGemini(prompt)
-      console.log('[schedule-homework] ✅ Gemini 폴백 성공')
+      console.log('[schedule-homework] ✅ Gemini 성공')
       return { result, provider: 'gemini' }
+    } catch (err) {
+      console.warn('[schedule-homework] ⚠️ Gemini 실패 — Groq로 폴백:', err.message)
     }
-    throw err
   }
+  // Groq 폴백
+  const result = await callGroq(prompt)
+  console.log('[schedule-homework] ✅ Groq 폴백 성공')
+  return { result, provider: 'groq' }
 }
 
 // ── 프롬프트 빌더 ────────────────────────────────────────────
