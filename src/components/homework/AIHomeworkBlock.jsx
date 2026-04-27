@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, Circle, RotateCcw, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import { HW_SUBJECTS, DIFFICULTY } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
@@ -45,8 +45,12 @@ export default function AIHomeworkBlock({ block, onEdit }) {
           }
         </button>
 
-        {/* 내용 */}
-        <div className="flex-1 min-w-0">
+        {/* 내용 — 클릭 시 편집 */}
+        <button
+          className="flex-1 min-w-0 text-left"
+          onClick={() => onEdit && hw && onEdit(hw)}
+          disabled={!onEdit || !hw}
+        >
           {/* 배지 행 */}
           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
             <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${subj.color}`}>
@@ -72,7 +76,7 @@ export default function AIHomeworkBlock({ block, onEdit }) {
           <p className={`text-sm font-semibold leading-snug ${done ? 'line-through text-slate-400' : 'text-slate-700'}`}>
             {block.homework_title}
           </p>
-        </div>
+        </button>
 
         {/* 시간 + 펼치기 */}
         <div className="flex-shrink-0 flex flex-col items-end gap-1">
@@ -118,14 +122,6 @@ export default function AIHomeworkBlock({ block, onEdit }) {
             <p className="text-xs text-slate-500 bg-white rounded-lg px-3 py-2">
               {hw.memo}
             </p>
-          )}
-          {onEdit && hw && (
-            <button
-              onClick={() => onEdit(hw)}
-              className="self-start flex items-center gap-1 text-xs text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-lg font-medium mt-0.5 active:bg-indigo-100"
-            >
-              <Pencil size={11} /> 숙제 수정
-            </button>
           )}
         </div>
       )}

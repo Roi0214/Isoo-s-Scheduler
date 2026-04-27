@@ -24,6 +24,7 @@ function findNextClassDate(eventTitle, schedules) {
     const dow = d.getDay()
     const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     for (const s of schedules) {
+      if (s.category === 'mission') continue  // 미션(등교 전 구몬, 보카 암기 등) 제외
       const titleTokens = s.title.toLowerCase().split(/\s+/)
       // 모든 키워드 토큰이 제목 토큰 중 하나와 정확히 일치해야 함
       if (!kwTokens.every(kw => titleTokens.some(t => t === kw))) continue
