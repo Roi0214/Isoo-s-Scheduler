@@ -157,7 +157,9 @@ async function callGroq(prompt) {
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Groq API 오류 ${res.status}: ${err}`)
+    const error = new Error(`Groq API 오류 ${res.status}: ${err}`)
+    error.status = res.status
+    throw error
   }
 
   const data = await res.json()
@@ -168,6 +170,64 @@ async function callGroq(prompt) {
     return JSON.parse(raw)
   } catch {
     throw new Error(`Groq 응답 JSON 파싱 실패:\n${raw.slice(0, 200)}`)
+  }
+}
+
+// ── Gemini API 호출 ───────────────────────────────────────────
+async function callGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`
+
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    systemInstruction: {
+      parts: [{ text: '당신은 초등학생 숙제 배분 전문가입니다. 반드시 유효한 JSON만 출력하세요. 마크다운, 설명, 코드블록 일절 금지.' }],
+    },
+    generationConfig: {
+      response_mime_type: 'application/json',
+      temperature: 0.2,
+      maxOutputTokens: 4096,
+    },
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Gemini API 오류 ${res.status}: ${err}`)
+  }
+
+  const data = await res.json()
+  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!raw) throw new Error('Gemini 응답이 비어 있습니다.')
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw new Error(`Gemini 응답 JSON 파싱 실패:\n${raw.slice(0, 200)}`)
+  }
+}
+
+// ── AI 호출 (Groq → Gemini 폴백) ─────────────────────────────
+async function callAI(prompt) {
+  try {
+    const result = await callGroq(prompt)
+    console.log('[schedule-homework] ✅ Groq 성공')
+    return { result, provider: 'groq' }
+  } catch (err) {
+    if (err.status === 429 && process.env.GEMINI_API_KEY) {
+      console.warn('[schedule-homework] ⚠️ Groq 429 한도 초과 — Gemini로 폴백')
+      const result = await callGemini(prompt)
+      console.log('[schedule-homework] ✅ Gemini 폴백 성공')
+      return { result, provider: 'gemini' }
+    }
+    throw err
   }
 }
 
@@ -352,9 +412,9 @@ export default async function handler(req, res) {
     }
 
     const prompt = buildPrompt(backlog, schedules, googleEvents || [], weekDates, customRulesText)
-    console.log('[schedule-homework] Groq 호출 시작...')
-    const result = await callGroq(prompt)
-    console.log('[schedule-homework] Groq 응답 수신 완료. blocks:', result.blocks?.length ?? 0)
+    console.log('[schedule-homework] AI 호출 시작...')
+    const { result, provider } = await callAI(prompt)
+    console.log(`[schedule-homework] ✅ ${provider} 응답 수신. blocks:`, result.blocks?.length ?? 0)
 
     // 응답 검증
     const blocks = Array.isArray(result.blocks) ? result.blocks : []
