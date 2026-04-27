@@ -130,7 +130,7 @@ async function callGroq(prompt) {
   const url = 'https://api.groq.com/openai/v1/chat/completions'
 
   const body = {
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.1-8b-instant',
     messages: [
       {
         role: 'system',
