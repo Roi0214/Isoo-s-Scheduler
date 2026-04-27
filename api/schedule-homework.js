@@ -313,19 +313,30 @@ ${customRulesText || DEFAULT_RULES_TEXT}
 }
 
 // ── 날짜 규칙 검증 (fixed_d1 · linked_event) ─────────────────
+function prevDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 function isBlockDateValid(block, hw, linkedEventMap) {
   if (!hw) return true
 
-  // fixed_d1: 반드시 dueDate 당일에만 배치
-  if (hw.fixed_d1 && hw.dueDate && block.date !== hw.dueDate) {
-    return false
-  }
-
-  // linked_event: 학원 당일(D)에는 배치 불가
   if (hw.linked_event && linkedEventMap[hw.linked_event]) {
-    if (linkedEventMap[hw.linked_event].includes(block.date)) {
-      return false
+    const classDates = linkedEventMap[hw.linked_event]
+
+    // linked_event: 학원 당일(D)에는 배치 불가
+    if (classDates.includes(block.date)) return false
+
+    // fixed_d1: 반드시 학원 하루 전날(D-1)에만 배치
+    // dueDate 대신 실제 수업일 기준으로 계산 (dueDate가 과거여도 정확히 동작)
+    if (hw.fixed_d1) {
+      const isD1 = classDates.some(cd => prevDay(cd) === block.date)
+      if (!isD1) return false
     }
+  } else if (hw.fixed_d1 && hw.dueDate) {
+    // linked_event 없는 fixed_d1: dueDate 기준으로 폴백
+    if (block.date !== hw.dueDate) return false
   }
 
   return true
