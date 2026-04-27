@@ -172,7 +172,16 @@ async function callGroq(prompt) {
 }
 
 // ── 프롬프트 빌더 ────────────────────────────────────────────
-function buildPrompt(homeworks, schedules, googleEvents, weekDates) {
+const DEFAULT_RULES_TEXT = `공통: 모든 블록의 start_time~end_time은 반드시 해당 날짜의 '가용슬롯' 범위 안에만 배치. 고정일정·식사시간과 1분도 겹쳐선 안됨
+A: linked_event 있으면 학원 당일(D) 제외, D-1까지 완료
+B: fixed_d1 플래그 숙제는 반드시 dueDate 당일 하루에만 배치(앞당기기·분할 절대 금지). 슬롯 부족해도 무조건 그 날에 배치
+C: div 숙제는 한 슬롯에 전체를 넣을 수 있으면 통으로 배치. 슬롯이 부족할 때만 unit 단위로 분할. units_today에 해당 세션 분량 기재
+D: 난이도상 → 평일19-21시/주말09-14시 우선. 중·하는 남은슬롯 자유
+E: 소프트22:00전, 하드22:30후 절대금지. 초과분 다음날/주말 이월→unscheduled
+F: priority=low 비반복 숙제는 high·medium 완료 후 여유슬롯에만 배치. 슬롯 부족 시 unscheduled 처리 가능
+G: repeat=daily 숙제(연산·구몬 등)는 due=null이면 이번 주 전체(일요일 포함), due=날짜이면 그 날까지 매일 1회 estimated_minutes분 블록 생성. priority=low인 경우 해당 날의 가용슬롯 합계가 60분 미만이거나 high/medium 숙제가 2개 이상 배치된 날은 생략 가능. units_today=null`
+
+function buildPrompt(homeworks, schedules, googleEvents, weekDates, customRulesText) {
   const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토']
 
   // 날짜별 가용 슬롯 + 고정 일정 요약
@@ -235,14 +244,7 @@ ${daySlotLines}
 ${homeworkLines || '없음'}
 
 [규칙]
-공통: 모든 블록의 start_time~end_time은 반드시 해당 날짜의 '가용슬롯' 범위 안에만 배치. 고정일정·식사시간과 1분도 겹쳐선 안됨
-A: linked_event 있으면 학원 당일(D) 제외, D-1까지 완료
-B: fixed_d1 플래그 숙제는 반드시 dueDate 당일 하루에만 배치(앞당기기·분할 절대 금지). 슬롯 부족해도 무조건 그 날에 배치
-C: div 숙제는 한 슬롯에 전체를 넣을 수 있으면 통으로 배치. 슬롯이 부족할 때만 unit 단위로 분할. units_today에 해당 세션 분량 기재
-D: 난이도상 → 평일19-21시/주말09-14시 우선. 중·하는 남은슬롯 자유
-E: 소프트22:00전, 하드22:30후 절대금지. 초과분 다음날/주말 이월→unscheduled
-F: priority=low 비반복 숙제는 high·medium 완료 후 여유슬롯에만 배치. 슬롯 부족 시 unscheduled 처리 가능
-G: repeat=daily 숙제(연산·구몬 등)는 due=null이면 이번 주 전체(일요일 포함), due=날짜이면 그 날까지 매일 1회 estimated_minutes분 블록 생성. priority=low인 경우 해당 날의 가용슬롯 합계가 60분 미만이거나 high/medium 숙제가 2개 이상 배치된 날은 생략 가능. units_today=null
+${customRulesText || DEFAULT_RULES_TEXT}
 
 [출력 JSON 스키마]
 {"blocks":[{"homework_id":"","homework_title":"","subject":"","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","units_today":null,"reason":""}],"unscheduled":[{"homework_id":"","homework_title":"","reason":""}]}`
@@ -328,7 +330,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: '요청 body JSON 파싱 실패' })
   }
 
-  const { homeworks, schedules, googleEvents, weekStart } = body ?? {}
+  const { homeworks, schedules, googleEvents, weekStart, customRulesText } = body ?? {}
 
   if (!homeworks || !schedules || !weekStart) {
     return res.status(400).json({ error: 'homeworks, schedules, weekStart 필드가 필요합니다.' })
@@ -349,7 +351,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ blocks: [], unscheduled: [] })
     }
 
-    const prompt = buildPrompt(backlog, schedules, googleEvents || [], weekDates)
+    const prompt = buildPrompt(backlog, schedules, googleEvents || [], weekDates, customRulesText)
     console.log('[schedule-homework] Groq 호출 시작...')
     const result = await callGroq(prompt)
     console.log('[schedule-homework] Groq 응답 수신 완료. blocks:', result.blocks?.length ?? 0)

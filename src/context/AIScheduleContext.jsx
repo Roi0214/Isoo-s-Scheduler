@@ -120,7 +120,7 @@ export function AIScheduleProvider({ children }) {
   }, [])
 
   /** AI 주간 배분 생성 — 오직 사용자 명시적 호출로만 실행 */
-  const generateSchedule = useCallback(async (homeworks, schedules, googleEvents, weekMonday) => {
+  const generateSchedule = useCallback(async (homeworks, schedules, googleEvents, weekMonday, customRulesText) => {
     // 중복 호출 원천 차단 (동기 ref)
     if (inFlightRef.current) {
       console.log('[AISchedule] ⚠️ 이미 생성 중 — 중복 호출 차단')
@@ -138,7 +138,7 @@ export function AIScheduleProvider({ children }) {
       const response = await fetch('/api/schedule-homework', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ homeworks, schedules, googleEvents, weekStart }),
+        body: JSON.stringify({ homeworks, schedules, googleEvents, weekStart, customRulesText }),
       })
 
       if (!response.ok) {

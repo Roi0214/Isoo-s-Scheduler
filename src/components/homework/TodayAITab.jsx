@@ -1,12 +1,14 @@
-import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical, RotateCcw, CheckSquare, Square, ListChecks } from 'lucide-react'
+import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical, RotateCcw, CheckSquare, Square, ListChecks, Settings2 } from 'lucide-react'
 import AIHomeworkBlock from './AIHomeworkBlock'
 import HomeworkFormModal from './HomeworkFormModal'
+import AIRulesModal from './AIRulesModal'
 import { useAISchedule } from '../../context/AIScheduleContext'
 import { useHomework } from '../../context/HomeworkContext'
 import { useSchedule } from '../../context/ScheduleContext'
 import { useGCal } from '../../context/GoogleCalendarContext'
 import { getWeekDates, localDateStr } from '../../utils/weekUtils'
 import { useState } from 'react'
+import { loadRules, buildRulesText } from '../../data/aiRules'
 
 const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -28,6 +30,8 @@ export default function TodayAITab() {
   const [rolledOver, setRolledOver] = useState(false)
   const [editHw, setEditHw] = useState(null)
   const [listOpen, setListOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [rules, setRules] = useState(() => loadRules())
 
   const now = new Date()
   const today = localDateStr(now)
@@ -57,7 +61,7 @@ export default function TodayAITab() {
       console.log('[TodayAITab] ⚠️ 생성 중 — 클릭 무시')
       return
     }
-    generateSchedule(homeworks, schedules, allGoogleEvents, weekMonday)
+    generateSchedule(homeworks, schedules, allGoogleEvents, weekMonday, buildRulesText(rules))
   }
 
   const handleDummy = () => {
@@ -132,6 +136,7 @@ export default function TodayAITab() {
   // ── 미생성 초기 상태 ───────────────────────────────────────
   if (!aiSchedule) {
     return (
+      <>
       <div className="flex flex-col items-center justify-center py-12 gap-5">
         <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center">
           <Sparkles size={30} className="text-indigo-400" />
@@ -163,11 +168,26 @@ export default function TodayAITab() {
           더미 데이터로 UI 미리보기
         </button>
 
+        <button
+          onClick={() => setRulesOpen(true)}
+          className="flex items-center gap-1.5 text-xs text-slate-400 px-3 py-1.5 rounded-xl font-medium"
+        >
+          <Settings2 size={12} /> 배분 규칙 편집
+        </button>
+
         <p className="text-xs text-slate-300 text-center leading-relaxed px-4">
           Gemini 2.0 Flash Lite · 5대 규칙 적용<br />
           (전날 완료·보카 복습·분할·난이도·수면 보호)
         </p>
       </div>
+
+      <AIRulesModal
+        isOpen={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        rules={rules}
+        onSave={setRules}
+      />
+      </>
     )
   }
 
@@ -195,6 +215,13 @@ export default function TodayAITab() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setRulesOpen(true)}
+            className="flex items-center gap-1 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl font-semibold"
+            title="AI 배분 규칙 편집"
+          >
+            <Settings2 size={11} /> 규칙
+          </button>
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
@@ -389,6 +416,13 @@ export default function TodayAITab() {
         isOpen={!!editHw}
         onClose={() => setEditHw(null)}
         editItem={editHw}
+      />
+
+      <AIRulesModal
+        isOpen={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        rules={rules}
+        onSave={setRules}
       />
     </div>
   )
