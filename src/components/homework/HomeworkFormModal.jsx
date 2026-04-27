@@ -14,7 +14,9 @@ function todayStr() {
 /** 학원 이름에 해당하는 다음 수업일 반환 (최대 14일 탐색) */
 function findNextClassDate(eventTitle, schedules) {
   if (!eventTitle?.trim()) return null
-  const keyword = eventTitle.trim().toLowerCase()
+  // 공백 기준으로 쪼갠 토큰 전부가 일정 제목 토큰과 정확히 일치해야 매칭
+  // ex) "픽션" → "트윈클 픽션" 매칭 O, "트윈클 논픽션" 매칭 X ("논픽션" ≠ "픽션")
+  const kwTokens = eventTitle.trim().toLowerCase().split(/\s+/)
   const today = new Date()
   for (let i = 0; i < 14; i++) {
     const d = new Date(today)
@@ -22,8 +24,9 @@ function findNextClassDate(eventTitle, schedules) {
     const dow = d.getDay()
     const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     for (const s of schedules) {
-      // 부분 포함 매칭 (대소문자 무시): "트윈클" → "트윈클 픽션", "트윈클 논픽션" 모두 매칭
-      if (!s.title.toLowerCase().includes(keyword)) continue
+      const titleTokens = s.title.toLowerCase().split(/\s+/)
+      // 모든 키워드 토큰이 제목 토큰 중 하나와 정확히 일치해야 함
+      if (!kwTokens.every(kw => titleTokens.some(t => t === kw))) continue
       if (!s.days.includes(dow)) continue
       if (s.exceptions?.includes(dateStr)) continue
       if (s.effectiveFrom && dateStr < s.effectiveFrom) continue
