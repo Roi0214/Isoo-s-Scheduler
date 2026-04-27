@@ -244,39 +244,40 @@ G: repeat=daily 숙제(연산·구몬 등)는 due=null이면 이번 주 전체(�
 function buildPrompt(homeworks, schedules, googleEvents, weekDates, customRulesText) {
   const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토']
 
-  // 날짜별 가용 슬롯 + 고정 일정 요약
+  // 날짜별 가용 슬롯 + 고정 일정 — 1줄 압축 형식
   const daySlotLines = weekDates.map(dateStr => {
     const dow = getDayOfWeek(dateStr)
     const dowKr = WEEKDAY_KR[dow]
     const weekend = isWeekend(dateStr)
-    const dayLabel = `${dateStr}(${dowKr})`
 
-    const fixedSchedules = getSchedulesForDate(schedules, dateStr)
+    const fixed = getSchedulesForDate(schedules, dateStr)
       .filter(s => s.category !== 'mission')
-      .map(s => `  - [고정] ${s.title} ${s.startTime}~${s.endTime}`)
-      .join('\n')
+      .map(s => `${s.title}${s.startTime}-${s.endTime}`)
+      .join(',')
 
-    const gcEvents = (googleEvents || [])
-      .filter(e => e.date === dateStr && !e.allDay)
-      .map(e => `  - [외부] ${e.title} ${e.startTime}~${e.endTime}`)
-      .join('\n')
+    const gc = (googleEvents || [])
+      .filter(e => e.date === dateStr && !e.allDay && e.startTime && e.endTime)
+      .map(e => `${e.title}${e.startTime}-${e.endTime}`)
+      .join(',')
 
     const slots = calcAvailableSlots(schedules, googleEvents, dateStr)
-    const slotLines = slots.length > 0
-      ? slots.map(s => `  - 빈슬롯: ${minutesToTime(s.start)}~${minutesToTime(s.end)} (${s.end - s.start}분)`).join('\n')
-      : '  - 빈슬롯 없음'
+    const slotStr = slots.length > 0
+      ? slots.map(s => `${minutesToTime(s.start)}-${minutesToTime(s.end)}(${s.end - s.start}m)`).join(',')
+      : '없음'
 
-    const dayType = weekend ? '[주말]' : '[평일]'
-    return `### ${dayLabel} ${dayType}\n고정일정:\n${fixedSchedules || '  없음'}\n외부이벤트:\n${gcEvents || '  없음'}\n가용슬롯:\n${slotLines}`
-  }).join('\n\n')
+    const type = weekend ? 'W' : 'P'
+    const fixedStr = fixed ? ` 고정=[${fixed}]` : ''
+    const gcStr = gc ? ` 외부=[${gc}]` : ''
+    return `${dateStr}(${dowKr})${type}:${fixedStr} 슬롯=[${slotStr}]`
+  }).join('\n')
 
   // 학원 일정 맵
   const linkedEventMap = buildLinkedEventMap(schedules, weekDates)
 
   // 학원별 수업 날짜 요약
   const linkedEventSummary = Object.entries(linkedEventMap)
-    .map(([title, dates]) => `  - "${title}": 수업일 = ${dates.join(', ')}`)
-    .join('\n')
+    .map(([title, dates]) => `${title}=${dates.join(',')}`)
+    .join(' / ')
 
   // 숙제 목록 (토큰 절약을 위해 간결하게 직렬화)
   const homeworkLines = homeworks
