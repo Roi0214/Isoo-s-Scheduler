@@ -216,7 +216,8 @@ function buildPrompt(homeworks, schedules, googleEvents, weekDates) {
       const div = hw.repeat ? 'repeat=daily' : (hw.is_divisible ? `div(unit=${hw.unit},total=${hw.total_units})` : 'nodiv')
       const lnk = hw.linked_event ? `lnk=${hw.linked_event}` : ''
       const due = hw.dueDate ? `due=${hw.dueDate}` : 'due=null'
-      return `${i + 1}|${hw.id}|${hw.title}|${hw.subject}|난이도${hw.difficulty}|${hw.estimated_minutes}min|${div}|${lnk}|${due}`
+      const d1 = hw.fixed_d1 ? '|fixed_d1' : ''
+      return `${i + 1}|${hw.id}|${hw.title}|${hw.subject}|난이도${hw.difficulty}|${hw.estimated_minutes}min|${div}|${lnk}|${due}${d1}`
     })
     .join('\n')
 
@@ -235,7 +236,7 @@ ${homeworkLines || '없음'}
 
 [규칙]
 A: linked_event 있으면 학원 당일(D) 제외, D-1까지 완료
-B: "보카복습"/"보카2차" 포함 숙제는 학원D-1 당일에만 배치(앞당기기 금지)
+B: fixed_d1 플래그 숙제는 반드시 dueDate 당일 하루에만 배치(앞당기기·분할 절대 금지). 슬롯 부족해도 무조건 그 날에 배치
 C: div 숙제는 한 슬롯에 전체를 넣을 수 있으면 통으로 배치. 슬롯이 부족할 때만 unit 단위로 분할. units_today에 해당 세션 분량 기재
 D: 난이도상 → 평일19-21시/주말09-14시 우선. 중·하는 남은슬롯 자유
 E: 소프트22:00전, 하드22:30후 절대금지. 초과분 다음날/주말 이월→unscheduled

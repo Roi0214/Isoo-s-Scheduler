@@ -14,7 +14,7 @@ function todayStr() {
 /** 학원 이름에 해당하는 다음 수업일 반환 (최대 14일 탐색) */
 function findNextClassDate(eventTitle, schedules) {
   if (!eventTitle?.trim()) return null
-  const title = eventTitle.trim()
+  const keyword = eventTitle.trim().toLowerCase()
   const today = new Date()
   for (let i = 0; i < 14; i++) {
     const d = new Date(today)
@@ -22,7 +22,8 @@ function findNextClassDate(eventTitle, schedules) {
     const dow = d.getDay()
     const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     for (const s of schedules) {
-      if (s.title !== title) continue
+      // 부분 포함 매칭 (대소문자 무시): "트윈클" → "트윈클 픽션", "트윈클 논픽션" 모두 매칭
+      if (!s.title.toLowerCase().includes(keyword)) continue
       if (!s.days.includes(dow)) continue
       if (s.exceptions?.includes(dateStr)) continue
       if (s.effectiveFrom && dateStr < s.effectiveFrom) continue
@@ -63,6 +64,7 @@ const EMPTY_FORM = {
   unit: null,
   total_units: null,
   linked_event: '',
+  fixed_d1: false,
 }
 
 export default function HomeworkFormModal({ isOpen, onClose, editItem = null, prefill = null }) {
@@ -88,6 +90,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
         unit: editItem.unit ?? null,
         total_units: editItem.total_units ?? null,
         linked_event: editItem.linked_event ?? '',
+        fixed_d1: editItem.fixed_d1 ?? false,
       }
     }
     if (prefill) {
@@ -288,18 +291,34 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
           </div>
         </div>
 
-        {/* 연결 학원 */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-600 mb-1">
-            연결 학원 <span className="text-slate-400 font-normal">(규칙 A·B: 전날 완료)</span>
-          </label>
-          <input
-            type="text"
-            value={form.linked_event}
-            onChange={e => setForm(p => ({ ...p, linked_event: e.target.value }))}
-            placeholder="예: 트윈클 픽션, 하윤네 수학"
-            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
+        {/* 연결 학원 + 전날 고정 */}
+        <div className="flex flex-col gap-2">
+          <div>
+            <label className="block text-sm font-semibold text-slate-600 mb-1">연결 학원</label>
+            <input
+              type="text"
+              value={form.linked_event}
+              onChange={e => setForm(p => ({ ...p, linked_event: e.target.value }))}
+              placeholder="예: 트윈클, 하윤네 수학"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+          </div>
+          {form.linked_event?.trim() && (
+            <div className="flex items-center justify-between pl-1">
+              <div>
+                <span className="text-sm font-medium text-slate-600">전날 고정 (D-1)</span>
+                <p className="text-xs text-slate-400">단어 암기 등 반드시 수업 전날에만 배치</p>
+              </div>
+              <div
+                onClick={() => setForm(p => ({ ...p, fixed_d1: !p.fixed_d1 }))}
+                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0
+                  ${form.fixed_d1 ? 'bg-rose-500' : 'bg-slate-200'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+                  ${form.fixed_d1 ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 분할 배분 설정 (기본 노출) */}
