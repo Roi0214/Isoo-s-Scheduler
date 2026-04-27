@@ -181,6 +181,72 @@ export default function TodayAITab() {
         </p>
       </div>
 
+      {/* ── 전체 숙제 목록 (접이식) ─────────────────────────── */}
+      <div className="mt-2 border border-slate-200 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setListOpen(v => !v)}
+          className="w-full flex items-center gap-2 px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+        >
+          <ListChecks size={14} className="text-slate-400 flex-shrink-0" />
+          <span className="text-sm font-bold text-slate-600 flex-1 text-left">전체 숙제 목록</span>
+          <span className="text-xs text-slate-400 mr-1">
+            {homeworks.filter(h => h.status === 'completed').length}/{homeworks.length} 종료
+          </span>
+          {listOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+        </button>
+        {listOpen && (
+          <div className="divide-y divide-slate-100">
+            {[...homeworks]
+              .sort((a, b) => {
+                if (a.status === 'completed' && b.status !== 'completed') return 1
+                if (a.status !== 'completed' && b.status === 'completed') return -1
+                return 0
+              })
+              .map(hw => {
+                const done = hw.status === 'completed'
+                return (
+                  <div
+                    key={hw.id}
+                    className={`flex items-center gap-3 px-4 py-2.5 transition-colors
+                      ${done ? 'bg-slate-50' : 'bg-white'}`}
+                  >
+                    <button
+                      onClick={() => updateHomework(hw.id, { status: done ? 'backlog' : 'completed' })}
+                      className="flex-shrink-0"
+                      aria-label={done ? '미완료로 되돌리기' : '종료 처리'}
+                    >
+                      {done
+                        ? <CheckSquare size={18} className="text-indigo-400" />
+                        : <Square size={18} className="text-slate-300" />
+                      }
+                    </button>
+                    <p className={`flex-1 text-sm truncate
+                      ${done ? 'line-through text-slate-400' : 'text-slate-700 font-medium'}`}>
+                      {hw.title}
+                    </p>
+                    <div className="flex-shrink-0 flex items-center gap-1.5">
+                      {hw.linked_event && (
+                        <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                          {hw.linked_event}
+                        </span>
+                      )}
+                      {hw.repeat && (
+                        <span className="text-xs text-indigo-300 bg-indigo-50 px-1.5 py-0.5 rounded-md">매일</span>
+                      )}
+                      {!hw.repeat && hw.dueDate && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded-md
+                          ${done ? 'text-slate-300' : 'text-slate-400'}`}>
+                          {hw.dueDate.slice(5)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        )}
+      </div>
+
       <AIRulesModal
         isOpen={rulesOpen}
         onClose={() => setRulesOpen(false)}
