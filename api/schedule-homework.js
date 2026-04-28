@@ -224,6 +224,19 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
     // 토/일은 항상 보충·선행 배치 가능 (수업날 제외)
     const weekendDays = weekDates.filter(d => isWeekend(d) && !classDates.has(d))
 
+    // ── 주말 우선 배치 조건 ──────────────────────────────────
+    // 1) 차주 이후 마감: 이번 주 토/일에 미리 처리하는 것이 자연스러움
+    // 2) 금요일 수업 연동: 수업 후 주말에 처리 (D-1 역방향 배치 방지)
+    const lastWeekDate    = weekDates[weekDates.length - 1]  // 이번 주 일요일
+    const fridayClassDate = [...classDates]
+      .filter(d => getDayOfWeek(d) === 5)
+      .sort()
+      .pop()  // 이번 주 금요일 수업일 (없으면 undefined)
+    const isNextWeekDue = hw.dueDate && hw.dueDate > lastWeekDate
+    const weekendFirst  =
+      isNextWeekDue ||
+      (!!fridayClassDate && (!hw.dueDate || hw.dueDate >= fridayClassDate))
+
     // fixed_d1 + linked_event: 수업 전날들만 (Rule B)
     if (hw.fixed_d1 && classDates.size > 0) {
       return [...classDates]
@@ -246,16 +259,22 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
       if (wkdCands.length === 0) {
         wkdCands = weekDates.filter(d => !classDates.has(d) && !isWeekend(d))
       }
-      // 분할 불가: 평일 내림차순(D-1 우선) + 토/일
+      // 분할 불가: 주말우선이면 토/일 → 평일 내림차순, 아니면 평일 내림차순 → 토/일
       if (!hw.is_divisible)
-        return [...[...wkdCands].sort((a, b) => b.localeCompare(a)), ...weekendDays]
-      // 분할 가능: 평일 오름차순 + 토/일
-      return [...wkdCands, ...weekendDays]
+        return weekendFirst
+          ? [...weekendDays, ...[...wkdCands].sort((a, b) => b.localeCompare(a))]
+          : [...[...wkdCands].sort((a, b) => b.localeCompare(a)), ...weekendDays]
+      // 분할 가능: 주말우선이면 토/일 → 평일 오름차순, 아니면 평일 오름차순 → 토/일
+      return weekendFirst
+        ? [...weekendDays, ...wkdCands]
+        : [...wkdCands, ...weekendDays]
     }
 
-    // linked_event 없음: dueDate 이전 평일 + 토/일
+    // linked_event 없음: 차주 마감이면 토/일 먼저, 아니면 평일 먼저
     const wkdCands = weekDates.filter(d => !isWeekend(d) && (!hw.dueDate || d <= hw.dueDate))
-    return [...wkdCands, ...weekendDays]
+    return weekendFirst
+      ? [...weekendDays, ...wkdCands]
+      : [...wkdCands, ...weekendDays]
   }
 
   // 단일 숙제 배치 실행
