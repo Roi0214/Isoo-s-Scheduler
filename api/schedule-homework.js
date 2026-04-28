@@ -143,7 +143,7 @@ async function callGroq(prompt) {
     ],
     response_format: { type: 'json_object' },
     temperature: 0.2,
-    max_tokens: 4096,
+    max_tokens: 2048,
   }
 
   const res = await fetch(url, {
@@ -216,6 +216,8 @@ async function callGemini(prompt) {
 
 // ── AI 호출 (Gemini 주 → Groq 폴백) ─────────────────────────
 async function callAI(prompt) {
+  let geminiError = null
+
   // Gemini 주 모델 (규칙 준수 우수, 100만 TPD)
   if (process.env.GEMINI_API_KEY) {
     try {
@@ -223,13 +225,23 @@ async function callAI(prompt) {
       console.log('[schedule-homework] ✅ Gemini 성공')
       return { result, provider: 'gemini' }
     } catch (err) {
-      console.warn('[schedule-homework] ⚠️ Gemini 실패 — Groq로 폴백:', err.message)
+      geminiError = err.message
+      console.warn('[schedule-homework] ⚠️ Gemini 실패 — Groq로 폴백:', err.message, err.status ?? '')
     }
+  } else {
+    console.warn('[schedule-homework] ⚠️ GEMINI_API_KEY 없음 — Groq로 폴백')
   }
+
   // Groq 폴백
-  const result = await callGroq(prompt)
-  console.log('[schedule-homework] ✅ Groq 폴백 성공')
-  return { result, provider: 'groq' }
+  try {
+    const result = await callGroq(prompt)
+    console.log('[schedule-homework] ✅ Groq 폴백 성공')
+    return { result, provider: 'groq' }
+  } catch (err) {
+    // 두 API 모두 실패 시 Gemini 에러도 함께 노출
+    const detail = geminiError ? `Gemini 오류: ${geminiError} / Groq 오류: ${err.message}` : err.message
+    throw new Error(detail)
+  }
 }
 
 // ── 프롬프트 빌더 ────────────────────────────────────────────
