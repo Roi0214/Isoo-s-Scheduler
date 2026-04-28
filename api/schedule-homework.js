@@ -220,7 +220,9 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
     // repeat=daily: 지정된 날짜만
     if (targetDate) return weekDates.includes(targetDate) ? [targetDate] : []
 
-    const classDates = new Set(getLinkedDates(hw.linked_event, linkedEventMap))
+    const classDates  = new Set(getLinkedDates(hw.linked_event, linkedEventMap))
+    // 토/일은 항상 보충·선행 배치 가능 (수업날 제외)
+    const weekendDays = weekDates.filter(d => isWeekend(d) && !classDates.has(d))
 
     // fixed_d1 + linked_event: 수업 전날들만 (Rule B)
     if (hw.fixed_d1 && classDates.size > 0) {
@@ -235,24 +237,25 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
       return weekDates.filter(d => d === hw.dueDate)
     }
 
-    // linked_event: 수업 당일 제외, dueDate 이전 모든 날 (Rule A)
     if (classDates.size > 0) {
-      let candidates = weekDates.filter(d => {
-        if (classDates.has(d))           return false
-        if (hw.dueDate && d > hw.dueDate) return false
-        return true
-      })
-      // dueDate가 수업일과 겹쳐 후보가 비는 경우 폴백: 수업 아닌 날 전체
-      if (candidates.length === 0) {
-        candidates = weekDates.filter(d => !classDates.has(d))
+      // 평일 후보: 수업날 제외, dueDate 이전
+      let wkdCands = weekDates.filter(
+        d => !classDates.has(d) && !isWeekend(d) && (!hw.dueDate || d <= hw.dueDate)
+      )
+      // 후보 없으면 폴백: 수업날 제외 평일 전체
+      if (wkdCands.length === 0) {
+        wkdCands = weekDates.filter(d => !classDates.has(d) && !isWeekend(d))
       }
-      // 분할 불가 숙제는 마감에 가까운 날 우선 (D-1에 가깝게)
-      if (!hw.is_divisible) candidates = [...candidates].sort((a, b) => b.localeCompare(a))
-      return candidates
+      // 분할 불가: 평일 내림차순(D-1 우선) + 토/일
+      if (!hw.is_divisible)
+        return [...[...wkdCands].sort((a, b) => b.localeCompare(a)), ...weekendDays]
+      // 분할 가능: 평일 오름차순 + 토/일
+      return [...wkdCands, ...weekendDays]
     }
 
-    // 일반: dueDate 이전 모든 날
-    return weekDates.filter(d => !hw.dueDate || d <= hw.dueDate)
+    // linked_event 없음: dueDate 이전 평일 + 토/일
+    const wkdCands = weekDates.filter(d => !isWeekend(d) && (!hw.dueDate || d <= hw.dueDate))
+    return [...wkdCands, ...weekendDays]
   }
 
   // 단일 숙제 배치 실행
