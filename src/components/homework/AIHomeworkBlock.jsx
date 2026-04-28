@@ -1,6 +1,6 @@
 import { Clock, CheckCircle2, Circle, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
-import { HW_SUBJECTS, DIFFICULTY } from '../../data/homeworkData'
+import { HW_SUBJECTS } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
 
 const SUBJECT_COLORS = {
@@ -21,13 +21,13 @@ export default function AIHomeworkBlock({ block, onEdit }) {
   const { isCompleted, toggleCompleted, homeworks } = useHomework()
   const [expanded, setExpanded] = useState(false)
 
-  const done = isCompleted(block.homework_id)
+  // 원본 숙제 데이터 조회 (메모·소요시간 등)
+  const hw = homeworks?.find(h => h.id === block.homework_id)
+  // repeat 숙제는 날짜별로 독립 완료 처리 (hwId:date 키 사용)
+  const blockKey = hw?.repeat ? `${block.homework_id}:${block.date}` : block.homework_id
+  const done = isCompleted(blockKey)
   const subj = HW_SUBJECTS[block.subject] ?? HW_SUBJECTS.etc
   const borderBg = SUBJECT_COLORS[block.subject] ?? SUBJECT_COLORS.etc
-
-  // 원본 숙제 데이터 조회 (난이도·메모·소요시간 등)
-  const hw = homeworks?.find(h => h.id === block.homework_id)
-  const diffInfo = hw?.difficulty ? DIFFICULTY[hw.difficulty] : null
 
   return (
     <div className={`rounded-2xl border-l-4 transition-opacity ${borderBg} ${done ? 'opacity-50' : ''}`}>
@@ -35,7 +35,7 @@ export default function AIHomeworkBlock({ block, onEdit }) {
       <div className="flex items-center gap-3 p-3">
         {/* 완료 체크 */}
         <button
-          onClick={() => toggleCompleted(block.homework_id)}
+          onClick={() => toggleCompleted(blockKey)}
           className="flex-shrink-0"
           aria-label={done ? '완료 취소' : '완료'}
         >
@@ -56,11 +56,6 @@ export default function AIHomeworkBlock({ block, onEdit }) {
             <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${subj.color}`}>
               {subj.label}
             </span>
-            {diffInfo && (
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${diffInfo.color}`}>
-                난이도 {diffInfo.label}
-              </span>
-            )}
             {block.rolledOver && (
               <span className="flex items-center gap-0.5 text-xs text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-md font-semibold">
                 <RotateCcw size={10} />
@@ -78,12 +73,14 @@ export default function AIHomeworkBlock({ block, onEdit }) {
           </p>
         </button>
 
-        {/* 시간 + 펼치기 */}
+        {/* 예상소요시간 + 펼치기 */}
         <div className="flex-shrink-0 flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1 text-xs text-slate-400 font-medium">
-            <Clock size={12} />
-            {block.start_time}~{block.end_time}
-          </div>
+          {hw?.estimated_minutes && (
+            <div className="flex items-center gap-1 text-xs text-slate-400 font-medium">
+              <Clock size={12} />
+              {block.units_today != null ? `${block.units_today}분` : `${hw.estimated_minutes}분`}
+            </div>
+          )}
           <button
             onClick={() => setExpanded(v => !v)}
             className="text-slate-300 hover:text-slate-500 transition-colors"
@@ -97,19 +94,6 @@ export default function AIHomeworkBlock({ block, onEdit }) {
       {/* 상세 펼침 */}
       {expanded && (
         <div className="px-4 pb-3 pt-0 flex flex-col gap-1.5 border-t border-black/5">
-          {hw?.estimated_minutes && (
-            <p className="text-xs text-slate-500">
-              <span className="font-semibold text-slate-600">총 소요시간</span> {hw.estimated_minutes}분
-              {hw.is_divisible && hw.unit && (
-                <span className="text-slate-400"> · {hw.unit}분 단위 분할 가능</span>
-              )}
-            </p>
-          )}
-          {block.units_today != null && (
-            <p className="text-xs text-slate-500">
-              <span className="font-semibold text-slate-600">오늘 분량</span> {block.units_today}단위
-            </p>
-          )}
           {hw?.linked_event && (
             <p className="text-xs text-slate-500">
               <span className="font-semibold text-slate-600">연결 학원</span> {hw.linked_event}
