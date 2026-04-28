@@ -237,11 +237,18 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
 
     // linked_event: 수업 당일 제외, dueDate 이전 모든 날 (Rule A)
     if (classDates.size > 0) {
-      return weekDates.filter(d => {
+      let candidates = weekDates.filter(d => {
         if (classDates.has(d))           return false
         if (hw.dueDate && d > hw.dueDate) return false
         return true
       })
+      // dueDate가 수업일과 겹쳐 후보가 비는 경우 폴백: 수업 아닌 날 전체
+      if (candidates.length === 0) {
+        candidates = weekDates.filter(d => !classDates.has(d))
+      }
+      // 분할 불가 숙제는 마감에 가까운 날 우선 (D-1에 가깝게)
+      if (!hw.is_divisible) candidates = [...candidates].sort((a, b) => b.localeCompare(a))
+      return candidates
     }
 
     // 일반: dueDate 이전 모든 날
@@ -280,34 +287,25 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
       return false
     }
 
-    // ── 분할 가능 (Rule C: 통째로 시도 → unit 단위 분할) ──
-    const unit      = hw.unit || hw.estimated_minutes
-    let remaining   = hw.estimated_minutes
+    // ── 분할 가능 (Rule C: unit 단위로 날짜에 분산 배치) ──
+    const unit    = hw.unit || hw.estimated_minutes
+    let remaining = hw.estimated_minutes
 
-    for (const d of candidates) {
-      if (remaining <= 0) break
-
-      // 남은 분량 전체를 한 슬롯에 넣기 시도
-      const fullSlot = findSlot(d, remaining, pref(d))
-      if (fullSlot) {
-        addBlock(hw, d, fullSlot.start, fullSlot.end, remaining)
-        remaining = 0
-        break
-      }
-
-      // unit 단위로 쪼개서 배치
-      let keepTrying = true
-      while (remaining > 0 && keepTrying) {
+    // 라운드로빈: 하루에 최대 1 unit씩, 후보 날짜를 돌며 분산
+    // remaining이 줄지 않으면(슬롯 없음) 루프 종료
+    let prevRemaining
+    do {
+      prevRemaining = remaining
+      for (const d of candidates) {
+        if (remaining <= 0) break
         const chunk = Math.min(remaining, unit)
         const slot  = findSlot(d, chunk, pref(d))
         if (slot) {
           addBlock(hw, d, slot.start, slot.end, chunk)
           remaining -= chunk
-        } else {
-          keepTrying = false
         }
       }
-    }
+    } while (remaining > 0 && remaining !== prevRemaining)
 
     if (remaining > 0) {
       const placed = hw.estimated_minutes - remaining
@@ -344,6 +342,8 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
     return pd !== 0 ? pd : a.targetDate.localeCompare(b.targetDate)
   })
   for (const { hw, targetDate } of repeatEntries) {
+    // mission 카테고리(구몬·등교전 루틴)는 평일에만 배치
+    if (hw.subject === 'mission' && isWeekend(targetDate)) continue
     // Rule G: low priority → 바쁜 날은 건너뜀
     if (hw.priority === 'low') {
       if (totalRemainingMins(targetDate) < 60 || countHighMedOnDate(targetDate) >= 2) continue
