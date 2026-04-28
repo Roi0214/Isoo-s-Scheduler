@@ -1,5 +1,5 @@
 /**
- * Vercel Serverless Function — AI 지능형 숙제 배분 엔진
+ * Vercel Serverless Function — 결정론적 숙제 배분 엔진
  * 경로: POST /api/schedule-homework
  *
  * Body: { homeworks, schedules, googleEvents, weekStart }
@@ -25,21 +25,26 @@ function getWeekDates(weekStart) {
     const d = new Date(weekStart + 'T00:00:00')
     d.setDate(d.getDate() + i)
     const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const mo = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
-    dates.push(`${y}-${m}-${day}`)
+    dates.push(`${y}-${mo}-${day}`)
   }
   return dates
 }
 
 function getDayOfWeek(dateStr) {
-  // 0=일, 1=월, ..., 6=토
   return new Date(dateStr + 'T00:00:00').getDay()
 }
 
 function isWeekend(dateStr) {
   const d = getDayOfWeek(dateStr)
   return d === 0 || d === 6
+}
+
+function prevDay(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // ── 고정 일정에서 해당 날짜의 일정 필터링 ─────────────────────
@@ -49,376 +54,339 @@ function getSchedulesForDate(schedules, dateStr) {
     if (!s.days.includes(dow)) return false
     if (s.exceptions && s.exceptions.includes(dateStr)) return false
     if (s.effectiveFrom && dateStr < s.effectiveFrom) return false
-    if (s.effectiveTo && dateStr > s.effectiveTo) return false
+    if (s.effectiveTo   && dateStr > s.effectiveTo)   return false
     return true
   })
 }
 
 // ── 가용 슬롯 계산 ───────────────────────────────────────────
-const HARD_DEADLINE = 22 * 60 + 30   // 22:30
-const SOFT_DEADLINE = 22 * 60        // 22:00
+const HARD_DEADLINE = 22 * 60 + 30  // 22:30
 
-// 슬롯 병합: 겹치거나 인접한 블록 제거 후 남은 빈 시간 반환
 function calcAvailableSlots(schedules, googleEvents, dateStr) {
-  const weekend = isWeekend(dateStr)
-
-  // 하교 후 시작 시간 (평일: 16:00, 주말: 09:00)
+  const weekend  = isWeekend(dateStr)
   const dayStart = weekend ? 9 * 60 : 16 * 60
 
-  // 고정 일정 블록 (미션 카테고리 제외 — 시간표에서도 제외하는 기존 로직과 동일)
   const fixedBlocks = getSchedulesForDate(schedules, dateStr)
     .filter(s => s.category !== 'mission')
     .map(s => ({ start: timeToMinutes(s.startTime), end: timeToMinutes(s.endTime) }))
 
-  // Google 캘린더 이벤트 블록
   const gcBlocks = (googleEvents || [])
     .filter(e => e.date === dateStr && !e.allDay && e.startTime && e.endTime)
     .map(e => ({ start: timeToMinutes(e.startTime), end: timeToMinutes(e.endTime) }))
 
-  // 식사 시간 블록
   const mealBlocks = weekend
-    ? [
-        { start: 12 * 60, end: 13 * 60 },  // 점심
-        { start: 18 * 60, end: 19 * 60 },  // 저녁
-      ]
-    : [
-        { start: 18 * 60, end: 19 * 60 },  // 저녁만
-      ]
+    ? [{ start: 12 * 60, end: 13 * 60 }, { start: 18 * 60, end: 19 * 60 }]
+    : [{ start: 18 * 60, end: 19 * 60 }]
 
   const allBlocks = [...fixedBlocks, ...gcBlocks, ...mealBlocks]
     .filter(b => b.end > dayStart && b.start < HARD_DEADLINE)
     .map(b => ({ start: Math.max(b.start, dayStart), end: Math.min(b.end, HARD_DEADLINE) }))
     .sort((a, b) => a.start - b.start)
 
-  // 빈 슬롯 계산
   const slots = []
   let cursor = dayStart
-
   for (const block of allBlocks) {
-    if (block.start > cursor) {
-      slots.push({ start: cursor, end: block.start })
-    }
+    if (block.start > cursor) slots.push({ start: cursor, end: block.start })
     cursor = Math.max(cursor, block.end)
   }
-  if (cursor < HARD_DEADLINE) {
-    slots.push({ start: cursor, end: HARD_DEADLINE })
-  }
+  if (cursor < HARD_DEADLINE) slots.push({ start: cursor, end: HARD_DEADLINE })
 
-  // 10분 미만 슬롯 제거
   return slots.filter(s => s.end - s.start >= 10)
 }
 
-// ── 학원 일정 맵 생성 (linked_event → 수업 날짜 목록) ──────────
+// ── 학원 일정 맵 (exact + prefix 매칭 지원) ──────────────────
 function buildLinkedEventMap(schedules, weekDates) {
-  const map = {}  // eventTitle → [dateStr, ...]
+  const map = {}
   for (const dateStr of weekDates) {
-    const daySchedules = getSchedulesForDate(schedules, dateStr)
-    for (const s of daySchedules) {
-      const title = s.title
-      if (!map[title]) map[title] = []
-      map[title].push(dateStr)
+    for (const s of getSchedulesForDate(schedules, dateStr)) {
+      if (!map[s.title]) map[s.title] = []
+      if (!map[s.title].includes(dateStr)) map[s.title].push(dateStr)
     }
   }
   return map
 }
 
-// ── Groq API 호출 ────────────────────────────────────────────
-async function callGroq(prompt) {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) throw new Error('GROQ_API_KEY 환경변수가 설정되지 않았습니다.')
+/**
+ * linked_event 문자열로 수업 날짜 목록 조회.
+ * - 정확히 일치하는 스케줄 제목 우선
+ * - 없으면 스케줄 제목이 linked_event로 시작하는 것 모두 수집
+ *   (예: '트윈클' → '트윈클 픽션', '트윈클 논픽션' 포함)
+ */
+function getLinkedDates(linkedEvent, linkedEventMap) {
+  if (!linkedEvent) return []
+  if (linkedEventMap[linkedEvent]) return linkedEventMap[linkedEvent]
 
-  const url = 'https://api.groq.com/openai/v1/chat/completions'
-
-  const body = {
-    model: 'llama-3.1-8b-instant',
-    messages: [
-      {
-        role: 'system',
-        content: '당신은 초등학생 숙제 배분 전문가입니다. 반드시 유효한 JSON만 출력하세요. 마크다운, 설명, 코드블록 일절 금지.',
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ],
-    response_format: { type: 'json_object' },
-    temperature: 0.2,
-    max_tokens: 2048,
-  }
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    const error = new Error(`Groq API 오류 ${res.status}: ${err}`)
-    error.status = res.status
-    throw error
-  }
-
-  const data = await res.json()
-  const raw = data?.choices?.[0]?.message?.content
-  if (!raw) throw new Error('Groq 응답이 비어 있습니다.')
-
-  try {
-    return JSON.parse(raw)
-  } catch {
-    throw new Error(`Groq 응답 JSON 파싱 실패:\n${raw.slice(0, 200)}`)
-  }
-}
-
-// ── Gemini API 호출 ───────────────────────────────────────────
-async function callGemini(prompt) {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다.')
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
-
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    systemInstruction: {
-      parts: [{ text: '당신은 초등학생 숙제 배분 전문가입니다. 반드시 유효한 JSON만 출력하세요. 마크다운, 설명, 코드블록 일절 금지.' }],
-    },
-    generationConfig: {
-      response_mime_type: 'application/json',
-      temperature: 0.2,
-      maxOutputTokens: 4096,
-    },
-  }
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Gemini API 오류 ${res.status}: ${err}`)
-  }
-
-  const data = await res.json()
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!raw) throw new Error('Gemini 응답이 비어 있습니다.')
-
-  try {
-    return JSON.parse(raw)
-  } catch {
-    throw new Error(`Gemini 응답 JSON 파싱 실패:\n${raw.slice(0, 200)}`)
-  }
-}
-
-// ── AI 호출 (Gemini 주 → Groq 폴백) ─────────────────────────
-async function callAI(prompt) {
-  let geminiError = null
-
-  // Gemini 주 모델 (규칙 준수 우수, 100만 TPD)
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const result = await callGemini(prompt)
-      console.log('[schedule-homework] ✅ Gemini 성공')
-      return { result, provider: 'gemini' }
-    } catch (err) {
-      geminiError = err.message
-      console.warn('[schedule-homework] ⚠️ Gemini 실패 — Groq로 폴백:', err.message, err.status ?? '')
+  const dates = new Set()
+  for (const [title, dateList] of Object.entries(linkedEventMap)) {
+    if (title.startsWith(linkedEvent)) {
+      dateList.forEach(d => dates.add(d))
     }
-  } else {
-    console.warn('[schedule-homework] ⚠️ GEMINI_API_KEY 없음 — Groq로 폴백')
   }
-
-  // Groq 폴백
-  try {
-    const result = await callGroq(prompt)
-    console.log('[schedule-homework] ✅ Groq 폴백 성공')
-    return { result, provider: 'groq' }
-  } catch (err) {
-    // 두 API 모두 실패 시 Gemini 에러도 함께 노출
-    const detail = geminiError ? `Gemini 오류: ${geminiError} / Groq 오류: ${err.message}` : err.message
-    throw new Error(detail)
-  }
+  return [...dates].sort()
 }
 
-// ── 프롬프트 빌더 ────────────────────────────────────────────
-const DEFAULT_RULES_TEXT = `공통: 모든 블록의 start_time~end_time은 반드시 해당 날짜의 '가용슬롯' 범위 안에만 배치. 고정일정·식사시간과 1분도 겹쳐선 안됨
-A: linked_event 있으면 학원 당일(D) 제외, D-1까지 완료
-B: fixed_d1 플래그 숙제는 반드시 dueDate 당일 하루에만 배치(앞당기기·분할 절대 금지). 슬롯 부족해도 무조건 그 날에 배치
-C: div 숙제는 한 슬롯에 전체를 넣을 수 있으면 통으로 배치. 슬롯이 부족할 때만 unit 단위로 분할. units_today에 해당 세션 분량 기재
-D: 난이도상 → 평일19-21시/주말09-14시 우선. 중·하는 남은슬롯 자유
-E: 소프트22:00전, 하드22:30후 절대금지. 초과분 다음날/주말 이월→unscheduled
-F: priority=low 비반복 숙제는 high·medium 완료 후 여유슬롯에만 배치. 슬롯 부족 시 unscheduled 처리 가능
-G: repeat=daily 숙제(연산·구몬 등)는 due=null이면 이번 주 전체(일요일 포함), due=날짜이면 그 날까지 매일 1회 estimated_minutes분 블록 생성. priority=low인 경우 해당 날의 가용슬롯 합계가 60분 미만이거나 high/medium 숙제가 2개 이상 배치된 날은 생략 가능. units_today=null`
-
-function buildPrompt(homeworks, schedules, googleEvents, weekDates, customRulesText) {
-  const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토']
-
-  // 날짜별 가용 슬롯 + 고정 일정
-  const daySlotLines = weekDates.map(dateStr => {
-    const dow = getDayOfWeek(dateStr)
-    const dowKr = WEEKDAY_KR[dow]
-    const weekend = isWeekend(dateStr)
-
-    const fixedSchedules = getSchedulesForDate(schedules, dateStr)
-      .filter(s => s.category !== 'mission')
-      .map(s => `  - [고정] ${s.title} ${s.startTime}~${s.endTime}`)
-      .join('\n')
-
-    const gcEvents = (googleEvents || [])
-      .filter(e => e.date === dateStr && !e.allDay)
-      .map(e => `  - [외부] ${e.title} ${e.startTime}~${e.endTime}`)
-      .join('\n')
-
-    const slots = calcAvailableSlots(schedules, googleEvents, dateStr)
-    const slotLines = slots.length > 0
-      ? slots.map(s => `  - 빈슬롯: ${minutesToTime(s.start)}~${minutesToTime(s.end)} (${s.end - s.start}분)`).join('\n')
-      : '  - 빈슬롯 없음'
-
-    const dayType = weekend ? '[주말]' : '[평일]'
-    return `### ${dateStr}(${dowKr}) ${dayType}\n고정일정:\n${fixedSchedules || '  없음'}\n외부이벤트:\n${gcEvents || '  없음'}\n가용슬롯:\n${slotLines}`
-  }).join('\n\n')
-
-  // 학원 일정 맵
+// ── 결정론적 스케줄러 ────────────────────────────────────────
+function runScheduler(homeworks, schedules, googleEvents, weekDates) {
+  const blocks      = []
+  const unscheduled = []
+  const hwMap       = Object.fromEntries(homeworks.map(h => [h.id, h]))
   const linkedEventMap = buildLinkedEventMap(schedules, weekDates)
 
-  // 학원별 수업 날짜 요약
-  const linkedEventSummary = Object.entries(linkedEventMap)
-    .map(([title, dates]) => `${title}=${dates.join(',')}`)
-    .join(' / ')
+  // 날짜별 사용 구간 추적
+  const dayUsed = {}
+  weekDates.forEach(d => { dayUsed[d] = [] })
 
-  // 숙제 목록 (토큰 절약을 위해 간결하게 직렬화)
-  const homeworkLines = homeworks
-    .filter(hw => hw.status !== 'completed')
-    .map((hw, i) => {
-      const div = hw.repeat ? 'repeat=daily' : (hw.is_divisible ? `div(unit=${hw.unit},total=${hw.total_units})` : 'nodiv')
-      const lnk = hw.linked_event ? `lnk=${hw.linked_event}` : ''
-      const due = hw.dueDate ? `due=${hw.dueDate}` : 'due=null'
-      const d1 = hw.fixed_d1 ? '|fixed_d1' : ''
-      return `${i + 1}|${hw.id}|${hw.title}|${hw.subject}|난이도${hw.difficulty}|${hw.estimated_minutes}min|${div}|${lnk}|${due}${d1}`
-    })
-    .join('\n')
-
-  return `JSON만 출력. 마크다운 블록 금지. 첫 글자 반드시 {
-
-초등학생(9세) 주간 숙제 배분. 주: ${weekDates[0]}~${weekDates[6]} (일요일 포함 7일 모두 배분 가능)
-
-[학원 수업일]
-${linkedEventSummary || '없음'}
-
-[가용 슬롯]
-${daySlotLines}
-
-[숙제목록] 형식: 번호|id|제목|과목|난이도|소요|분할|연결학원|마감
-${homeworkLines || '없음'}
-
-[규칙]
-${customRulesText || DEFAULT_RULES_TEXT}
-
-[출력 JSON 스키마]
-{"blocks":[{"homework_id":"","date":"YYYY-MM-DD","start_time":"HH:MM","end_time":"HH:MM","units_today":null}],"unscheduled":[{"homework_id":"","reason":""}]}`
-}
-
-// ── 날짜 규칙 검증 (fixed_d1 · linked_event) ─────────────────
-function prevDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() - 1)
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-
-function isBlockDateValid(block, hw, linkedEventMap) {
-  if (!hw) return true
-
-  if (hw.linked_event && linkedEventMap[hw.linked_event]) {
-    const classDates = linkedEventMap[hw.linked_event]
-
-    // linked_event: 학원 당일(D)에는 배치 불가
-    if (classDates.includes(block.date)) return false
-
-    // fixed_d1: 반드시 학원 하루 전날(D-1)에만 배치
-    // dueDate 대신 실제 수업일 기준으로 계산 (dueDate가 과거여도 정확히 동작)
-    if (hw.fixed_d1) {
-      const isD1 = classDates.some(cd => prevDay(cd) === block.date)
-      if (!isD1) return false
+  // ── 사용 구간 제거 후 남은 슬롯 반환 ──
+  function subtractUsed(slots, used) {
+    let result = [...slots]
+    for (const u of used) {
+      result = result.flatMap(s => {
+        if (u.end <= s.start || u.start >= s.end) return [s]
+        const parts = []
+        if (u.start > s.start) parts.push({ start: s.start, end: u.start })
+        if (u.end   < s.end)   parts.push({ start: u.end,   end: s.end   })
+        return parts
+      }).filter(s => s.end - s.start >= 10)
     }
-  } else if (hw.fixed_d1 && hw.dueDate) {
-    // linked_event 없는 fixed_d1: dueDate 기준으로 폴백
-    if (block.date !== hw.dueDate) return false
+    return result
   }
 
-  return true
-}
-
-// ── 블록 유효성 검증 ─────────────────────────────────────────
-/**
- * AI가 생성한 블록이 학원·식사 시간과 겹치거나
- * 가용 범위(dayStart ~ HARD_DEADLINE)를 벗어나면 false 반환
- */
-function isBlockValid(block, schedules, googleEvents) {
-  if (!block.start_time || !block.end_time || !block.date) return false
-  const start = timeToMinutes(block.start_time)
-  const end   = timeToMinutes(block.end_time)
-  if (start >= end) return false
-
-  const weekend  = isWeekend(block.date)
-  const dayStart = weekend ? 9 * 60 : 16 * 60
-
-  // 가용 범위 밖
-  if (start < dayStart || end > HARD_DEADLINE) return false
-
-  // 고정 일정과 겹침
-  const daySchedules = getSchedulesForDate(schedules, block.date)
-    .filter(s => s.category !== 'mission')
-  for (const s of daySchedules) {
-    const sStart = timeToMinutes(s.startTime)
-    const sEnd   = timeToMinutes(s.endTime)
-    if (start < sEnd && end > sStart) return false
+  function getRemaining(dateStr) {
+    return subtractUsed(
+      calcAvailableSlots(schedules, googleEvents, dateStr),
+      dayUsed[dateStr] || []
+    )
   }
 
-  // Google 캘린더 이벤트와 겹침
-  const gcEvents = (googleEvents || []).filter(
-    e => e.date === block.date && !e.allDay && e.startTime && e.endTime
-  )
-  for (const e of gcEvents) {
-    const eStart = timeToMinutes(e.startTime)
-    const eEnd   = timeToMinutes(e.endTime)
-    if (start < eEnd && end > eStart) return false
+  function totalRemainingMins(dateStr) {
+    return getRemaining(dateStr).reduce((sum, s) => sum + s.end - s.start, 0)
   }
 
-  // 식사 시간과 겹침
-  const mealBlocks = weekend
-    ? [{ start: 12 * 60, end: 13 * 60 }, { start: 18 * 60, end: 19 * 60 }]
-    : [{ start: 18 * 60, end: 19 * 60 }]
-  for (const m of mealBlocks) {
-    if (start < m.end && end > m.start) return false
+  function markUsed(dateStr, start, end) {
+    dayUsed[dateStr].push({ start, end })
+    dayUsed[dateStr].sort((a, b) => a.start - b.start)
   }
 
-  return true
+  // 해당 날짜에 이미 배치된 high/medium 블록 수
+  function countHighMedOnDate(dateStr) {
+    return blocks.filter(b => {
+      if (b.date !== dateStr) return false
+      const hw = hwMap[b.homework_id]
+      return hw?.priority === 'high' || hw?.priority === 'medium'
+    }).length
+  }
+
+  // 난이도별 선호 시간대 (Rule D)
+  function preferredRange(difficulty, dateStr) {
+    if (difficulty !== '상') return null
+    return isWeekend(dateStr)
+      ? { start: 9 * 60, end: 14 * 60 }
+      : { start: 19 * 60, end: 21 * 60 }
+  }
+
+  // 선호 시간대 → 일반 순으로 슬롯 탐색
+  function findSlot(dateStr, duration, pref) {
+    const slots = getRemaining(dateStr)
+
+    if (pref) {
+      for (const s of slots) {
+        const rs = Math.max(s.start, pref.start)
+        const re = Math.min(s.end,   pref.end)
+        if (re - rs >= duration) return { start: rs, end: rs + duration }
+      }
+    }
+    for (const s of slots) {
+      if (s.end - s.start >= duration) return { start: s.start, end: s.start + duration }
+    }
+    return null
+  }
+
+  // 블록 추가 및 사용 구간 등록
+  function addBlock(hw, dateStr, start, end, unitsToday) {
+    blocks.push({
+      homework_id:    hw.id,
+      homework_title: hw.title,
+      subject:        hw.subject,
+      date:           dateStr,
+      start_time:     minutesToTime(start),
+      end_time:       minutesToTime(end),
+      units_today:    unitsToday ?? null,
+    })
+    markUsed(dateStr, start, end)
+  }
+
+  // 배치 가능한 날짜 목록 계산
+  function getCandidateDates(hw, targetDate) {
+    // repeat=daily: 지정된 날짜만
+    if (targetDate) return weekDates.includes(targetDate) ? [targetDate] : []
+
+    const classDates = new Set(getLinkedDates(hw.linked_event, linkedEventMap))
+
+    // fixed_d1 + linked_event: 수업 전날들만 (Rule B)
+    if (hw.fixed_d1 && classDates.size > 0) {
+      return [...classDates]
+        .map(prevDay)
+        .filter(d => weekDates.includes(d))
+        .sort()
+    }
+
+    // fixed_d1만 (linked_event 없음): dueDate 당일만 (Rule B)
+    if (hw.fixed_d1 && hw.dueDate) {
+      return weekDates.filter(d => d === hw.dueDate)
+    }
+
+    // linked_event: 수업 당일 제외, dueDate 이전 모든 날 (Rule A)
+    if (classDates.size > 0) {
+      return weekDates.filter(d => {
+        if (classDates.has(d))           return false
+        if (hw.dueDate && d > hw.dueDate) return false
+        return true
+      })
+    }
+
+    // 일반: dueDate 이전 모든 날
+    return weekDates.filter(d => !hw.dueDate || d <= hw.dueDate)
+  }
+
+  // 단일 숙제 배치 실행
+  function scheduleOne(hw, targetDate) {
+    const candidates = getCandidateDates(hw, targetDate)
+
+    if (candidates.length === 0) {
+      unscheduled.push({
+        homework_id:    hw.id,
+        homework_title: hw.title,
+        reason: '배치 가능한 날짜 없음 (마감일·학원 제약)',
+      })
+      return false
+    }
+
+    const pref = (d) => preferredRange(hw.difficulty, d)
+
+    // ── 분할 불가 (Rule C: 통으로만) ──
+    if (!hw.is_divisible) {
+      for (const d of candidates) {
+        const slot = findSlot(d, hw.estimated_minutes, pref(d))
+        if (slot) {
+          addBlock(hw, d, slot.start, slot.end, null)
+          return true
+        }
+      }
+      unscheduled.push({
+        homework_id:    hw.id,
+        homework_title: hw.title,
+        reason: '슬롯 부족 — 배치 실패',
+      })
+      return false
+    }
+
+    // ── 분할 가능 (Rule C: 통째로 시도 → unit 단위 분할) ──
+    const unit      = hw.unit || hw.estimated_minutes
+    let remaining   = hw.estimated_minutes
+
+    for (const d of candidates) {
+      if (remaining <= 0) break
+
+      // 남은 분량 전체를 한 슬롯에 넣기 시도
+      const fullSlot = findSlot(d, remaining, pref(d))
+      if (fullSlot) {
+        addBlock(hw, d, fullSlot.start, fullSlot.end, remaining)
+        remaining = 0
+        break
+      }
+
+      // unit 단위로 쪼개서 배치
+      let keepTrying = true
+      while (remaining > 0 && keepTrying) {
+        const chunk = Math.min(remaining, unit)
+        const slot  = findSlot(d, chunk, pref(d))
+        if (slot) {
+          addBlock(hw, d, slot.start, slot.end, chunk)
+          remaining -= chunk
+        } else {
+          keepTrying = false
+        }
+      }
+    }
+
+    if (remaining > 0) {
+      const placed = hw.estimated_minutes - remaining
+      unscheduled.push({
+        homework_id:    hw.id,
+        homework_title: hw.title,
+        reason: placed > 0
+          ? `부분 배치 (${placed}/${hw.estimated_minutes}분 완료, ${remaining}분 슬롯 부족)`
+          : '슬롯 부족 — 배치 실패',
+      })
+      return false
+    }
+    return true
+  }
+
+  // ── 배치 우선순위 ─────────────────────────────────────────
+  const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
+
+  // 1단계: fixed_d1 (가장 제약이 강함, Rule B)
+  const fixed_d1Hws = homeworks.filter(hw => hw.fixed_d1 && !hw.repeat)
+  fixed_d1Hws.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+  for (const hw of fixed_d1Hws) scheduleOne(hw, null)
+
+  // 2단계: repeat=daily (날짜 지정, Rule G)
+  const repeatEntries = []
+  for (const hw of homeworks.filter(h => h.repeat)) {
+    for (const d of weekDates) {
+      if (hw.dueDate && d > hw.dueDate) continue
+      repeatEntries.push({ hw, targetDate: d })
+    }
+  }
+  repeatEntries.sort((a, b) => {
+    const pd = (PRIORITY_ORDER[a.hw.priority] ?? 1) - (PRIORITY_ORDER[b.hw.priority] ?? 1)
+    return pd !== 0 ? pd : a.targetDate.localeCompare(b.targetDate)
+  })
+  for (const { hw, targetDate } of repeatEntries) {
+    // Rule G: low priority → 바쁜 날은 건너뜀
+    if (hw.priority === 'low') {
+      if (totalRemainingMins(targetDate) < 60 || countHighMedOnDate(targetDate) >= 2) continue
+    }
+    scheduleOne(hw, targetDate)
+  }
+
+  // 3단계: 일반 high/medium (non-fixed_d1, Rule A·C·D·E)
+  const highMedHws = homeworks.filter(hw => !hw.fixed_d1 && !hw.repeat && hw.priority !== 'low')
+  highMedHws.sort((a, b) => {
+    const pd = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1)
+    return pd !== 0 ? pd : (a.dueDate || '').localeCompare(b.dueDate || '')
+  })
+  for (const hw of highMedHws) scheduleOne(hw, null)
+
+  // 4단계: low priority (Rule F: 여유 슬롯에만)
+  const lowHws = homeworks.filter(hw => !hw.fixed_d1 && !hw.repeat && hw.priority === 'low')
+  lowHws.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+  for (const hw of lowHws) {
+    const candidates = getCandidateDates(hw, null)
+    const hasFreeSlot = candidates.some(d => totalRemainingMins(d) >= hw.estimated_minutes)
+    if (!hasFreeSlot) {
+      unscheduled.push({
+        homework_id:    hw.id,
+        homework_title: hw.title,
+        reason: '우선순위 낮음 — 여유 슬롯 없음 (Rule F)',
+      })
+      continue
+    }
+    scheduleOne(hw, null)
+  }
+
+  return { blocks, unscheduled }
 }
 
 // ── 메인 핸들러 ──────────────────────────────────────────────
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 허용됩니다.' })
-
-  const geminiKey = process.env.GEMINI_API_KEY
-  const groqKey   = process.env.GROQ_API_KEY
-  console.log('[schedule-homework] Gemini Key:', geminiKey ? '설정됨' : '없음')
-  console.log('[schedule-homework] Groq Key:',   groqKey   ? '설정됨' : '없음')
-
-  if (!geminiKey && !groqKey) {
-    return res.status(500).json({
-      error: 'GEMINI_API_KEY 또는 GROQ_API_KEY 중 하나 이상 설정되어야 합니다.',
-    })
-  }
+  if (req.method !== 'POST')   return res.status(405).json({ error: 'POST만 허용됩니다.' })
 
   let body
   try {
@@ -427,103 +395,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: '요청 body JSON 파싱 실패' })
   }
 
-  const { homeworks, schedules, googleEvents, weekStart, customRulesText } = body ?? {}
+  const { homeworks, schedules, googleEvents, weekStart } = body ?? {}
 
   if (!homeworks || !schedules || !weekStart) {
     return res.status(400).json({ error: 'homeworks, schedules, weekStart 필드가 필요합니다.' })
   }
 
-  // weekStart 요일 검증 — 월요일이 아니면 그냥 통과 (엄격 검증 완화)
-  const startDow = getDayOfWeek(weekStart)
-  console.log('[schedule-homework] weekStart:', weekStart, '/ 요일(0=일):', startDow)
-
   try {
     const weekDates = getWeekDates(weekStart)
+    const backlog   = homeworks.filter(hw => hw.status !== 'completed')
 
-    // 배분 대상: 미완료 백로그 숙제만
-    const backlog = homeworks.filter(hw => hw.status !== 'completed')
     console.log('[schedule-homework] 배분 대상 숙제 수:', backlog.length)
 
     if (backlog.length === 0) {
       return res.status(200).json({ blocks: [], unscheduled: [] })
     }
 
-    const prompt = buildPrompt(backlog, schedules, googleEvents || [], weekDates, customRulesText)
-    console.log('[schedule-homework] AI 호출 시작...')
-    const { result, provider } = await callAI(prompt)
-    console.log(`[schedule-homework] ✅ ${provider} 응답 수신. blocks:`, result.blocks?.length ?? 0)
+    const { blocks, unscheduled } = runScheduler(backlog, schedules, googleEvents || [], weekDates)
 
-    // 응답 검증
-    const blocks = Array.isArray(result.blocks) ? result.blocks : []
-    const unscheduled = Array.isArray(result.unscheduled) ? result.unscheduled : []
+    console.log(`[schedule-homework] ✅ 배분 완료 — blocks: ${blocks.length}, unscheduled: ${unscheduled.length}`)
 
-    // homework_title·subject는 AI 출력에서 제거했으므로 서버에서 보완
-    const hwMap = Object.fromEntries(backlog.map(h => [h.id, h]))
-    const enrichedBlocks = blocks.map(b => ({
-      ...b,
-      homework_title: hwMap[b.homework_id]?.title || b.homework_id,
-      subject:        hwMap[b.homework_id]?.subject || 'etc',
-    }))
-
-    // ── 사후 검증 1: 시간 범위·충돌 ───────────────────────────
-    const timeValidBlocks   = enrichedBlocks.filter(b => isBlockValid(b, schedules, googleEvents || []))
-    const timeInvalidBlocks = enrichedBlocks.filter(b => !isBlockValid(b, schedules, googleEvents || []))
-    if (timeInvalidBlocks.length > 0) {
-      console.warn('[schedule-homework] ⚠️ 시간 충돌 블록 제거:', timeInvalidBlocks.length)
-    }
-
-    // ── 사후 검증 2: 날짜 규칙 (fixed_d1·linked_event) ────────
-    const ruleLinkedMap = buildLinkedEventMap(schedules, weekDates)
-    const validBlocks   = timeValidBlocks.filter(b => isBlockDateValid(b, hwMap[b.homework_id], ruleLinkedMap))
-    const dateInvalidBlocks = timeValidBlocks.filter(b => !isBlockDateValid(b, hwMap[b.homework_id], ruleLinkedMap))
-    if (dateInvalidBlocks.length > 0) {
-      console.warn('[schedule-homework] ⚠️ 날짜 규칙 위반 블록 제거:', dateInvalidBlocks.length)
-    }
-
-    // 유효하지 않아 제거된 블록 → unscheduled 이동 (원인별 메시지 분리)
-    const scheduledIds = new Set(validBlocks.map(b => b.homework_id))
-
-    const timeInvalidUnscheduled = timeInvalidBlocks
-      .filter(b => !scheduledIds.has(b.homework_id))
-      .map(b => ({
-        homework_id:    b.homework_id,
-        homework_title: hwMap[b.homework_id]?.title || b.homework_id,
-        reason: '생성된 시간이 학원·식사 시간과 겹쳐 제거됨 — 재생성 필요',
-      }))
-
-    const dateInvalidUnscheduled = dateInvalidBlocks
-      .filter(b => !scheduledIds.has(b.homework_id))
-      .map(b => ({
-        homework_id:    b.homework_id,
-        homework_title: hwMap[b.homework_id]?.title || b.homework_id,
-        reason: '날짜 규칙 위반으로 제거됨 (전날 고정·학원 당일 배치 금지) — 재생성 필요',
-      }))
-
-    const invalidUnscheduled = [...timeInvalidUnscheduled, ...dateInvalidUnscheduled]
-
-    // 기존 unscheduled + 새로 추가된 것 합산 (중복 제거)
-    const allUnscheduled = [...unscheduled]
-    for (const u of invalidUnscheduled) {
-      if (!allUnscheduled.some(x => x.homework_id === u.homework_id)) {
-        allUnscheduled.push(u)
-      }
-    }
-
-    // 이미 validBlocks에 있는 것은 unscheduled에서 제거
-    // homework_title 보완 (AI 출력에서 제거됐으므로 서버에서 채움)
-    const finalUnscheduled = allUnscheduled
-      .filter(u => !scheduledIds.has(u.homework_id))
-      .map(u => ({
-        ...u,
-        homework_title: u.homework_title || hwMap[u.homework_id]?.title || u.homework_id,
-      }))
-
-    return res.status(200).json({ blocks: validBlocks, unscheduled: finalUnscheduled })
+    return res.status(200).json({ blocks, unscheduled })
   } catch (err) {
     console.error('[schedule-homework] ❌ 오류:', err.message)
-    return res.status(500).json({
-      error: `AI 배분 실패: ${err.message}`,
-      debug: { step: 'callGroq or buildPrompt' },
-    })
+    return res.status(500).json({ error: `배분 실패: ${err.message}` })
   }
 }
