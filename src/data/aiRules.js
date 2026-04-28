@@ -56,28 +56,42 @@ export const DEFAULT_AI_RULES = [
   },
 ]
 
+import { dbLoad, dbSave } from '../lib/db'
+
 const STORAGE_KEY = 'kid-scheduler:aiRules'
+
+function mergeWithDefaults(parsed) {
+  return DEFAULT_AI_RULES.map(def => {
+    const found = parsed.find(p => p.key === def.key)
+    return found ? { ...def, text: found.text, enabled: found.enabled ?? true } : { ...def, enabled: true }
+  })
+}
 
 export function loadRules() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (!saved) return DEFAULT_AI_RULES.map(r => ({ ...r, enabled: true }))
-    const parsed = JSON.parse(saved)
-    // 새로 추가된 기본 규칙은 자동 병합
-    const merged = DEFAULT_AI_RULES.map(def => {
-      const found = parsed.find(p => p.key === def.key)
-      return found ? { ...def, text: found.text, enabled: found.enabled ?? true } : { ...def, enabled: true }
-    })
-    return merged
+    return mergeWithDefaults(JSON.parse(saved))
   } catch {
     return DEFAULT_AI_RULES.map(r => ({ ...r, enabled: true }))
   }
 }
 
 export function saveRules(rules) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(
-    rules.map(r => ({ key: r.key, text: r.text, enabled: r.enabled }))
-  ))
+  const payload = rules.map(r => ({ key: r.key, text: r.text, enabled: r.enabled }))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  dbSave('aiRules', payload)
+}
+
+/** 앱 시작 시 Supabase에서 규칙을 가져와 localStorage 갱신 */
+export async function syncRulesFromDB() {
+  try {
+    const remote = await dbLoad('aiRules')
+    if (!remote) return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(remote))
+  } catch {
+    // 오프라인이면 무시
+  }
 }
 
 /** rules 배열 → 프롬프트 삽입용 문자열 */

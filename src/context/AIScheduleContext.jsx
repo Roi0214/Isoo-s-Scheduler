@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { localDateStr, getWeekDates } from '../utils/weekUtils'
+import { dbLoad, dbSave } from '../lib/db'
 
 const AIScheduleContext = createContext(null)
 
@@ -84,6 +85,16 @@ export function AIScheduleProvider({ children }) {
   )
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState(null)
+  const [dbLoaded, setDbLoaded] = useState(false)
+
+  // ── Supabase 초기 로드 ────────────────────────────────
+  useEffect(() => {
+    dbLoad('aiSchedule').then(remote => {
+      if (remote !== null) setAiSchedule(remote)
+    }).catch(err => {
+      console.warn('[AIScheduleContext] DB 로드 실패:', err?.message)
+    }).finally(() => setDbLoaded(true))
+  }, [])
 
   // ── 동기적 중복 호출 방어 ref ──────────────────────────────
   const inFlightRef = useRef(false)
@@ -91,10 +102,12 @@ export function AIScheduleProvider({ children }) {
   useEffect(() => {
     if (aiSchedule) {
       localStorage.setItem('kid-scheduler:aiSchedule', JSON.stringify(aiSchedule))
+      if (dbLoaded) dbSave('aiSchedule', aiSchedule)
     } else {
       localStorage.removeItem('kid-scheduler:aiSchedule')
+      if (dbLoaded) dbSave('aiSchedule', null)
     }
-  }, [aiSchedule])
+  }, [aiSchedule, dbLoaded])
 
   // ──────────────────────────────────────────────────────────
   // ※ 자동 호출 없음 — generateSchedule은 오직 사용자 버튼 클릭으로만 실행됨.

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { AppProvider, useApp, TABS } from './context/AppContext'
 import { ScheduleProvider } from './context/ScheduleContext'
 import { HomeworkProvider } from './context/HomeworkContext'
@@ -8,6 +9,7 @@ import BottomNav from './components/layout/BottomNav'
 import SchedulePage from './pages/SchedulePage'
 import HomeworkPage from './pages/HomeworkPage'
 import WeeklyPage from './pages/WeeklyPage'
+import { syncRulesFromDB } from './data/aiRules'
 import './index.css'
 
 function PageRouter() {
@@ -20,6 +22,8 @@ function PageRouter() {
 }
 
 function AppShell() {
+  useEffect(() => { syncRulesFromDB() }, [])
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Header />

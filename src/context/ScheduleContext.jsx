@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import { SCHEDULES, DEFAULT_CATEGORIES, buildCategories } from '../data/scheduleData'
+import { dbLoad, dbSave } from '../lib/db'
 
 const ScheduleContext = createContext(null)
 
@@ -13,6 +14,9 @@ function loadFromStorage(key, fallback) {
 }
 
 export function ScheduleProvider({ children }) {
+  // ── DB 초기 로드 완료 플래그 ──────────────────────
+  const [dbLoaded, setDbLoaded] = useState(false)
+
   // ── 분류 상태 ───────────────────────────────────
   const [categoryMap, setCategoryMap] = useState(() =>
     loadFromStorage('kid-scheduler:categoryMap', DEFAULT_CATEGORIES)
@@ -20,7 +24,8 @@ export function ScheduleProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem('kid-scheduler:categoryMap', JSON.stringify(categoryMap))
-  }, [categoryMap])
+    if (dbLoaded) dbSave('categoryMap', categoryMap)
+  }, [categoryMap, dbLoaded])
 
   // color/dot 포함된 완성형 분류 객체 (메모이제이션)
   const categories = useMemo(() => buildCategories(categoryMap), [categoryMap])
@@ -48,7 +53,8 @@ export function ScheduleProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem('kid-scheduler:schedules', JSON.stringify(schedules))
-  }, [schedules])
+    if (dbLoaded) dbSave('schedules', schedules)
+  }, [schedules, dbLoaded])
 
   const addSchedule = useCallback((item) => {
     setSchedules(prev => [...prev, { ...item, id: `schedule-${Date.now()}`, exceptions: [], googleCalendarId: null }])
@@ -109,7 +115,23 @@ export function ScheduleProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem('kid-scheduler:scheduleCompleted', JSON.stringify(completedMap))
-  }, [completedMap])
+    if (dbLoaded) dbSave('scheduleCompleted', completedMap)
+  }, [completedMap, dbLoaded])
+
+  // ── Supabase 초기 로드 ───────────────────────────
+  useEffect(() => {
+    Promise.all([
+      dbLoad('schedules'),
+      dbLoad('categoryMap'),
+      dbLoad('scheduleCompleted'),
+    ]).then(([remoteSch, remoteCat, remoteComp]) => {
+      if (remoteSch  !== null) setSchedules(remoteSch)
+      if (remoteCat  !== null) setCategoryMap(remoteCat)
+      if (remoteComp !== null) setCompletedMap(remoteComp)
+    }).catch(err => {
+      console.warn('[ScheduleContext] DB 로드 실패, localStorage 사용:', err?.message)
+    }).finally(() => setDbLoaded(true))
+  }, [])
 
   const isCompleted = useCallback((scheduleId, dateStr) =>
     !!completedMap[`${scheduleId}_${dateStr}`], [completedMap])

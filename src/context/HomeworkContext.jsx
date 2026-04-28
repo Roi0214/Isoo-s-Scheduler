@@ -3,6 +3,7 @@ import { HOMEWORKS, migrateHomework } from '../data/homeworkData'
 import { localDateStr } from '../utils/weekUtils'
 import { findNextClassDate, prevDayStr } from '../utils/scheduleUtils'
 import { useSchedule } from './ScheduleContext'
+import { dbLoad, dbSave } from '../lib/db'
 
 const HomeworkContext = createContext(null)
 
@@ -18,15 +19,82 @@ function loadFromStorage(key, fallback) {
 export function HomeworkProvider({ children }) {
   const { schedules } = useSchedule()
 
-  // ── 숙제 목록 상태 — 로드 시 마이그레이션 적용 ──────────
+  // ── 숙제 목록 ───────────────────────────────────────────
   const [homeworks, setHomeworks] = useState(() =>
     loadFromStorage('kid-scheduler:homeworks', HOMEWORKS).map(migrateHomework)
   )
 
+  // ── 완료 상태 ───────────────────────────────────────────
+  const [completedSet, setCompletedSet] = useState(() =>
+    new Set(loadFromStorage('kid-scheduler:hwCompleted', []))
+  )
+
+  // ── DB 초기 로드 완료 플래그 ────────────────────────────
+  const [dbLoaded, setDbLoaded] = useState(false)
+
+  // ── Supabase 초기 로드 (앱 시작 시 1회) ─────────────────
+  useEffect(() => {
+    Promise.all([
+      dbLoad('homeworks'),
+      dbLoad('hwCompleted'),
+    ]).then(([remoteHw, remoteCompleted]) => {
+      if (remoteHw   !== null) setHomeworks(remoteHw.map(migrateHomework))
+      if (remoteCompleted !== null) setCompletedSet(new Set(remoteCompleted))
+    }).catch(err => {
+      console.warn('[HomeworkContext] DB 로드 실패, localStorage 사용:', err?.message)
+    }).finally(() => setDbLoaded(true))
+  }, [])
+
+  // ── 숙제 변경 → localStorage + Supabase 저장 ───────────
   useEffect(() => {
     localStorage.setItem('kid-scheduler:homeworks', JSON.stringify(homeworks))
-  }, [homeworks])
+    if (dbLoaded) dbSave('homeworks', homeworks)
+  }, [homeworks, dbLoaded])
 
+  // ── 완료 상태 변경 → localStorage + Supabase 저장 ───────
+  useEffect(() => {
+    const arr = [...completedSet]
+    localStorage.setItem('kid-scheduler:hwCompleted', JSON.stringify(arr))
+    if (dbLoaded) dbSave('hwCompleted', arr)
+  }, [completedSet, dbLoaded])
+
+  // ── 학원 연동 숙제 자동 재활성화 ────────────────────────
+  // DB 로드 완료 + schedules 준비 후 실행:
+  //   마감일이 지난 linked_event 숙제 → dueDate를 다음 수업 D-1로 갱신 + status 복구
+  useEffect(() => {
+    if (!dbLoaded || !schedules?.length) return
+    const today = localDateStr(new Date())
+    const recycledIds = []
+
+    setHomeworks(prev => {
+      let changed = false
+      const updated = prev.map(hw => {
+        if (hw.repeat || !hw.linked_event || !hw.dueDate) return hw
+        if (hw.dueDate >= today) return hw
+
+        const nextClass = findNextClassDate(hw.linked_event, schedules)
+        if (!nextClass) return hw
+
+        const newDueDate = prevDayStr(nextClass)
+        if (newDueDate === hw.dueDate) return hw
+
+        changed = true
+        if (!hw.is_divisible) recycledIds.push(hw.id)
+        return { ...hw, dueDate: newDueDate, status: 'backlog' }
+      })
+      return changed ? updated : prev
+    })
+
+    if (recycledIds.length > 0) {
+      setCompletedSet(prev => {
+        const next = new Set(prev)
+        recycledIds.forEach(id => next.delete(id))
+        return next
+      })
+    }
+  }, [dbLoaded, schedules])
+
+  // ── CRUD ────────────────────────────────────────────────
   const addHomework = useCallback((item) => {
     setHomeworks(prev => [
       ...prev,
@@ -41,55 +109,6 @@ export function HomeworkProvider({ children }) {
   const deleteHomework = useCallback((id) => {
     setHomeworks(prev => prev.filter(h => h.id !== id))
   }, [])
-
-  // ── 완료 상태 ───────────────────────────────────────────
-  const [completedSet, setCompletedSet] = useState(() =>
-    new Set(loadFromStorage('kid-scheduler:hwCompleted', []))
-  )
-
-  useEffect(() => {
-    localStorage.setItem('kid-scheduler:hwCompleted', JSON.stringify([...completedSet]))
-  }, [completedSet])
-
-  // ── 학원 연동 숙제 자동 재활성화 ────────────────────────
-  // schedules가 로드되거나 변경될 때 실행:
-  //   마감일이 지난 linked_event 숙제 → dueDate를 다음 수업 D-1로 갱신 + status 복구
-  useEffect(() => {
-    if (!schedules?.length) return
-    const today = localDateStr(new Date())
-    const recycledIds = []   // non-divisible 숙제 완료 상태 초기화 대상
-
-    setHomeworks(prev => {
-      let changed = false
-      const updated = prev.map(hw => {
-        // repeat 숙제 · linked_event 없음 · 아직 마감 안 됨 → 건너뜀
-        if (hw.repeat || !hw.linked_event || !hw.dueDate) return hw
-        if (hw.dueDate >= today) return hw
-
-        // 다음 수업일 탐색
-        const nextClass = findNextClassDate(hw.linked_event, schedules)
-        if (!nextClass) return hw
-
-        const newDueDate = prevDayStr(nextClass)
-        if (newDueDate === hw.dueDate) return hw  // 변경 없음
-
-        changed = true
-        // non-divisible 숙제는 hwId만으로 완료 키를 쓰므로 초기화 대상에 추가
-        if (!hw.is_divisible) recycledIds.push(hw.id)
-        return { ...hw, dueDate: newDueDate, status: 'backlog' }
-      })
-      return changed ? updated : prev   // 변경 없으면 동일 참조 반환 → re-render 없음
-    })
-
-    // 재활성화된 숙제의 AI 블록 완료 상태 초기화
-    if (recycledIds.length > 0) {
-      setCompletedSet(prev => {
-        const next = new Set(prev)
-        recycledIds.forEach(id => next.delete(id))
-        return next
-      })
-    }
-  }, [schedules])
 
   const isCompleted = useCallback((hwId) => completedSet.has(hwId), [completedSet])
 
@@ -108,6 +127,7 @@ export function HomeworkProvider({ children }) {
       homeworks,
       addHomework, updateHomework, deleteHomework,
       isCompleted, toggleCompleted, completedCount,
+      dbLoaded,
     }}>
       {children}
     </HomeworkContext.Provider>
