@@ -23,8 +23,10 @@ export default function AIHomeworkBlock({ block, onEdit }) {
 
   // 원본 숙제 데이터 조회 (메모·소요시간 등)
   const hw = homeworks?.find(h => h.id === block.homework_id)
-  // repeat 숙제는 날짜별로 독립 완료 처리 (hwId:date 키 사용)
-  const blockKey = hw?.repeat ? `${block.homework_id}:${block.date}` : block.homework_id
+  // repeat·is_divisible 숙제는 날짜별로 독립 완료 처리 (hwId:date 키 사용)
+  const blockKey = (hw?.repeat || hw?.is_divisible)
+    ? `${block.homework_id}:${block.date}`
+    : block.homework_id
   const done = isCompleted(blockKey)
   const subj = HW_SUBJECTS[block.subject] ?? HW_SUBJECTS.etc
   const borderBg = SUBJECT_COLORS[block.subject] ?? SUBJECT_COLORS.etc
