@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { localDateStr, getWeekDates } from '../utils/weekUtils'
-import { dbLoad, dbSave } from '../lib/db'
+import { dbLoad, dbSave, localSave } from '../lib/db'
 
 const AIScheduleContext = createContext(null)
 
@@ -100,13 +100,8 @@ export function AIScheduleProvider({ children }) {
   const inFlightRef = useRef(false)
 
   useEffect(() => {
-    if (aiSchedule) {
-      localStorage.setItem('kid-scheduler:aiSchedule', JSON.stringify(aiSchedule))
-      if (dbLoaded) dbSave('aiSchedule', aiSchedule)
-    } else {
-      localStorage.removeItem('kid-scheduler:aiSchedule')
-      if (dbLoaded) dbSave('aiSchedule', null)
-    }
+    localSave('aiSchedule', aiSchedule ?? null)
+    if (dbLoaded) dbSave('aiSchedule', aiSchedule ?? null)
   }, [aiSchedule, dbLoaded])
 
   // ──────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import { SCHEDULES, DEFAULT_CATEGORIES, buildCategories } from '../data/scheduleData'
-import { dbLoad, dbSave } from '../lib/db'
+import { dbLoad, dbSave, localSave } from '../lib/db'
 
 const ScheduleContext = createContext(null)
 
@@ -23,7 +23,7 @@ export function ScheduleProvider({ children }) {
   )
 
   useEffect(() => {
-    localStorage.setItem('kid-scheduler:categoryMap', JSON.stringify(categoryMap))
+    localSave('categoryMap', categoryMap)
     if (dbLoaded) dbSave('categoryMap', categoryMap)
   }, [categoryMap, dbLoaded])
 
@@ -52,7 +52,7 @@ export function ScheduleProvider({ children }) {
   )
 
   useEffect(() => {
-    localStorage.setItem('kid-scheduler:schedules', JSON.stringify(schedules))
+    localSave('schedules', schedules)
     if (dbLoaded) dbSave('schedules', schedules)
   }, [schedules, dbLoaded])
 
@@ -114,7 +114,7 @@ export function ScheduleProvider({ children }) {
   )
 
   useEffect(() => {
-    localStorage.setItem('kid-scheduler:scheduleCompleted', JSON.stringify(completedMap))
+    localSave('scheduleCompleted', completedMap)
     if (dbLoaded) dbSave('scheduleCompleted', completedMap)
   }, [completedMap, dbLoaded])
 

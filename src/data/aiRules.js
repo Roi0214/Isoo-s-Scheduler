@@ -56,7 +56,7 @@ export const DEFAULT_AI_RULES = [
   },
 ]
 
-import { dbLoad, dbSave } from '../lib/db'
+import { dbLoad, dbSave, localSave } from '../lib/db'
 
 const STORAGE_KEY = 'kid-scheduler:aiRules'
 
@@ -79,7 +79,7 @@ export function loadRules() {
 
 export function saveRules(rules) {
   const payload = rules.map(r => ({ key: r.key, text: r.text, enabled: r.enabled }))
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  localSave('aiRules', payload)
   dbSave('aiRules', payload)
 }
 
@@ -88,7 +88,8 @@ export async function syncRulesFromDB() {
   try {
     const remote = await dbLoad('aiRules')
     if (!remote) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(remote))
+    // dbLoad가 Supabase 최신 데이터를 반환한 경우에만 여기에 도달
+    localSave('aiRules', remote)
   } catch {
     // 오프라인이면 무시
   }

@@ -3,7 +3,7 @@ import { HOMEWORKS, migrateHomework } from '../data/homeworkData'
 import { localDateStr } from '../utils/weekUtils'
 import { findNextClassDate, prevDayStr } from '../utils/scheduleUtils'
 import { useSchedule } from './ScheduleContext'
-import { dbLoad, dbSave } from '../lib/db'
+import { dbLoad, dbSave, localSave } from '../lib/db'
 
 const HomeworkContext = createContext(null)
 
@@ -47,14 +47,14 @@ export function HomeworkProvider({ children }) {
 
   // ── 숙제 변경 → localStorage + Supabase 저장 ───────────
   useEffect(() => {
-    localStorage.setItem('kid-scheduler:homeworks', JSON.stringify(homeworks))
+    localSave('homeworks', homeworks)
     if (dbLoaded) dbSave('homeworks', homeworks)
   }, [homeworks, dbLoaded])
 
   // ── 완료 상태 변경 → localStorage + Supabase 저장 ───────
   useEffect(() => {
     const arr = [...completedSet]
-    localStorage.setItem('kid-scheduler:hwCompleted', JSON.stringify(arr))
+    localSave('hwCompleted', arr)
     if (dbLoaded) dbSave('hwCompleted', arr)
   }, [completedSet, dbLoaded])
 
