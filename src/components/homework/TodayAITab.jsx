@@ -29,7 +29,6 @@ export default function TodayAITab() {
   const { schedules } = useSchedule()
   const { getEventsForDate } = useGCal()
   const [expandedDays, setExpandedDays] = useState({})
-  const [rolledOver, setRolledOver] = useState(false)
   const [editHw, setEditHw] = useState(null)
   const [listOpen, setListOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
@@ -58,9 +57,11 @@ export default function TodayAITab() {
     return !isCompleted(blockKey)
   }) ?? []
 
+  // rolledOver: aiSchedule에서 파생 (새로고침 후에도 유지)
+  const rolledOver = aiSchedule?.blocks.some(b => b.rolledOver) ?? false
+
   const handleRollover = () => {
-    const count = redistributeIncomplete(today, isCompleted, homeworks)
-    if (count > 0) setRolledOver(true)
+    redistributeIncomplete(today, isCompleted, homeworks)
   }
 
   // ── 버튼 핸들러 ─────────────────────────────────────────────
@@ -70,10 +71,13 @@ export default function TodayAITab() {
       console.log('[TodayAITab] ⚠️ 생성 중 — 클릭 무시')
       return
     }
-    // Fix 1: 완료된 일반 숙제 제외 (반복/분할은 날짜별 완료이므로 모두 포함)
-    const hwsToSchedule = homeworks.filter(hw =>
-      (hw.repeat || hw.is_divisible) ? true : !isCompleted(hw.id)
-    )
+    // 종료 처리(hw.status) 또는 완료 체크(completedSet) 된 일반 숙제 제외
+    // 반복·분할은 날짜별 완료이므로 항상 포함 (단, 종료 처리된 건 제외)
+    const hwsToSchedule = homeworks.filter(hw => {
+      if (hw.status === 'completed') return false
+      if (hw.repeat || hw.is_divisible) return true
+      return !isCompleted(hw.id)
+    })
     generateSchedule(hwsToSchedule, schedules, allGoogleEvents, weekMonday, slotSettings)
   }
 
@@ -104,8 +108,8 @@ export default function TodayAITab() {
         <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center animate-pulse">
           <Sparkles size={26} className="text-indigo-500" />
         </div>
-        <p className="text-sm font-semibold text-slate-600">AI가 최적 시간표를 계산하는 중...</p>
-        <p className="text-xs text-slate-400">5대 규칙 분석 중, 잠시만 기다려 주세요</p>
+        <p className="text-sm font-semibold text-slate-600">최적 시간표를 계산하는 중...</p>
+        <p className="text-xs text-slate-400">규칙 A~G 적용 중, 잠시만 기다려 주세요</p>
       </div>
     )
   }
@@ -155,7 +159,7 @@ export default function TodayAITab() {
           <Sparkles size={30} className="text-indigo-400" />
         </div>
         <div className="text-center">
-          <p className="text-base font-bold text-slate-700 mb-1">AI 주간 배분이 아직 없어요</p>
+          <p className="text-base font-bold text-slate-700 mb-1">주간 배분이 아직 없어요</p>
           <p className="text-sm text-slate-400 leading-relaxed">
             전체 숙제 리스트의 항목을 기반으로<br />
             이번 주 최적 시간표를 자동 생성합니다.
@@ -169,7 +173,7 @@ export default function TodayAITab() {
           className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-indigo-200 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Sparkles size={16} />
-          AI 주간 배분 생성
+          주간 배분 생성
         </button>
 
         {/* 더미 데이터 미리보기 버튼 */}
@@ -206,7 +210,7 @@ export default function TodayAITab() {
           <ListChecks size={14} className="text-slate-400 flex-shrink-0" />
           <span className="text-sm font-bold text-slate-600 flex-1 text-left">전체 숙제 목록</span>
           <span className="text-xs text-slate-400 mr-1">
-            {homeworks.filter(h => h.status === 'completed').length}/{homeworks.length} 종료
+            {homeworks.filter(h => h.status === 'completed' || isCompleted(h.id)).length}/{homeworks.length} 완료
           </span>
           {listOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
         </button>
@@ -214,12 +218,15 @@ export default function TodayAITab() {
           <div className="divide-y divide-slate-100">
             {[...homeworks]
               .sort((a, b) => {
-                if (a.status === 'completed' && b.status !== 'completed') return 1
-                if (a.status !== 'completed' && b.status === 'completed') return -1
+                const doneA = a.status === 'completed' || isCompleted(a.id)
+                const doneB = b.status === 'completed' || isCompleted(b.id)
+                if (doneA && !doneB) return 1
+                if (!doneA && doneB) return -1
                 return 0
               })
               .map(hw => {
-                const done = hw.status === 'completed'
+                const done = hw.status === 'completed' || isCompleted(hw.id)
+                const isArchived = hw.status === 'completed'
                 return (
                   <div
                     key={hw.id}
@@ -227,9 +234,9 @@ export default function TodayAITab() {
                       ${done ? 'bg-slate-50' : 'bg-white'}`}
                   >
                     <button
-                      onClick={() => updateHomework(hw.id, { status: done ? 'backlog' : 'completed' })}
+                      onClick={() => updateHomework(hw.id, { status: isArchived ? 'backlog' : 'completed' })}
                       className="flex-shrink-0"
-                      aria-label={done ? '미완료로 되돌리기' : '종료 처리'}
+                      aria-label={isArchived ? '종료 취소' : '종료 처리'}
                     >
                       {done
                         ? <CheckSquare size={18} className="text-indigo-400" />
@@ -290,7 +297,7 @@ export default function TodayAITab() {
           <div className="flex items-center gap-1.5">
             <Sparkles size={14} className="text-indigo-500" />
             <p className="text-sm font-bold text-slate-700">
-              AI 주간 배분 결과
+              주간 배분 결과
               {isDummy && (
                 <span className="ml-1.5 text-xs font-normal text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md">
                   더미 데이터
@@ -435,7 +442,7 @@ export default function TodayAITab() {
           <ListChecks size={14} className="text-slate-400 flex-shrink-0" />
           <span className="text-sm font-bold text-slate-600 flex-1 text-left">전체 숙제 목록</span>
           <span className="text-xs text-slate-400 mr-1">
-            {homeworks.filter(h => h.status === 'completed').length}/{homeworks.length} 종료
+            {homeworks.filter(h => h.status === 'completed' || isCompleted(h.id)).length}/{homeworks.length} 완료
           </span>
           {listOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
         </button>
@@ -445,13 +452,15 @@ export default function TodayAITab() {
           <div className="divide-y divide-slate-100">
             {[...homeworks]
               .sort((a, b) => {
-                // 미완료 먼저
-                if (a.status === 'completed' && b.status !== 'completed') return 1
-                if (a.status !== 'completed' && b.status === 'completed') return -1
+                const doneA = a.status === 'completed' || isCompleted(a.id)
+                const doneB = b.status === 'completed' || isCompleted(b.id)
+                if (doneA && !doneB) return 1
+                if (!doneA && doneB) return -1
                 return 0
               })
               .map(hw => {
-                const done = hw.status === 'completed'
+                const done = hw.status === 'completed' || isCompleted(hw.id)
+                const isArchived = hw.status === 'completed'
                 return (
                   <div
                     key={hw.id}
@@ -460,9 +469,9 @@ export default function TodayAITab() {
                   >
                     {/* 종료 토글 */}
                     <button
-                      onClick={() => updateHomework(hw.id, { status: done ? 'backlog' : 'completed' })}
+                      onClick={() => updateHomework(hw.id, { status: isArchived ? 'backlog' : 'completed' })}
                       className="flex-shrink-0"
-                      aria-label={done ? '미완료로 되돌리기' : '종료 처리'}
+                      aria-label={isArchived ? '종료 취소' : '종료 처리'}
                     >
                       {done
                         ? <CheckSquare size={18} className="text-indigo-400" />

@@ -89,12 +89,14 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
 
   const [form, setForm] = useState(buildInitial)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [linkedEventWarning, setLinkedEventWarning] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setForm(buildInitial())
       setShowDeleteConfirm(false)
       setAutoDateLabel(null)
+      setLinkedEventWarning(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
@@ -102,15 +104,17 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
   // linked_event 변경 시 다음 수업일 D-1을 dueDate로 자동 설정
   useEffect(() => {
     if (form.repeat) return                          // repeat 모드엔 dueDate 불필요
-    const title = form.linked_event?.trim()
-    if (!title) { setAutoDateLabel(null); return }
+    const title = (form.linked_event === '__custom__' ? '' : form.linked_event)?.trim()
+    if (!title) { setAutoDateLabel(null); setLinkedEventWarning(false); return }
     const nextClass = findNextClassDate(title, schedules)
     if (nextClass) {
       const due = prevDayStr(nextClass)
       setForm(p => ({ ...p, dueDate: due }))
       setAutoDateLabel(title)
+      setLinkedEventWarning(false)
     } else {
       setAutoDateLabel(null)
+      setLinkedEventWarning(true)   // 매칭 실패 경고
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.linked_event, form.repeat, schedules])
@@ -313,6 +317,12 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
               />
             )}
           </div>
+          {linkedEventWarning && (
+            <p className="text-xs text-amber-500 bg-amber-50 rounded-xl px-3 py-2 mt-1">
+              ⚠ 등록된 학원 일정을 찾을 수 없어요. 마감일이 자동 설정되지 않습니다.<br />
+              <span className="text-amber-400">일정 탭에서 학원 이름을 확인해 주세요.</span>
+            </p>
+          )}
           {form.linked_event?.trim() && form.linked_event !== '__custom__' && (
             <div className="flex items-center justify-between pl-1">
               <div>

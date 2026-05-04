@@ -379,7 +379,8 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
     return pd !== 0 ? pd : a.targetDate.localeCompare(b.targetDate)
   })
   for (const { hw, targetDate } of repeatEntries) {
-    // mission 카테고리(구몬·등교전 루틴)는 평일에만 배치
+    // subject='mission'인 반복 숙제(등교 루틴 등)는 평일에만 배치
+    // subject='math' 등 일반 반복 숙제(구몬·연산)는 주말 포함 매일 배치 (의도된 동작)
     if (hw.subject === 'mission' && isWeekend(targetDate)) continue
     // Rule G: low priority → 바쁜 날은 건너뜀
     if (hw.priority === 'low') {
