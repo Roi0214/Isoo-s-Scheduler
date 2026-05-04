@@ -294,9 +294,9 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
 
   // 단일 숙제 배치 실행
   function scheduleOne(hw, targetDate) {
-    const candidates = getCandidateDates(hw, targetDate)
+    const rawCandidates = getCandidateDates(hw, targetDate)
 
-    if (candidates.length === 0) {
+    if (rawCandidates.length === 0) {
       unscheduled.push({
         homework_id:    hw.id,
         homework_title: hw.title,
@@ -304,6 +304,13 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
       })
       return false
     }
+
+    // ── 남은 가용 시간 기준 정렬 (부하 분산) ──────────────────
+    // fixed_d1·반복(targetDate 지정): 날짜 고정이므로 원래 순서 유지
+    // 일반 숙제: 학원 등으로 바쁜 날을 피해 여유 있는 날 우선 배치
+    const candidates = (targetDate || hw.fixed_d1)
+      ? rawCandidates
+      : [...rawCandidates].sort((a, b) => totalRemainingMins(b) - totalRemainingMins(a))
 
     const pref = (d) => preferredRange(hw.difficulty, d)
 
@@ -319,7 +326,7 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
       unscheduled.push({
         homework_id:    hw.id,
         homework_title: hw.title,
-        reason: '슬롯 부족 — 배치 실패',
+        reason: `슬롯 부족 — 배치 실패 (${candidates.map(d => `${d.slice(5)}:${totalRemainingMins(d)}분`).join(', ')})`,
       })
       return false
     }
@@ -333,7 +340,11 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
     let prevRemaining
     do {
       prevRemaining = remaining
-      for (const d of candidates) {
+      // 분할 배치도 매 라운드마다 잔여 시간 기준 재정렬 → 부하 분산
+      const sorted = (targetDate || hw.fixed_d1)
+        ? candidates
+        : [...candidates].sort((a, b) => totalRemainingMins(b) - totalRemainingMins(a))
+      for (const d of sorted) {
         if (remaining <= 0) break
         const chunk = Math.min(remaining, unit)
         const slot  = findSlot(d, chunk, pref(d))
