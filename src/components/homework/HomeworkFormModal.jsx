@@ -123,6 +123,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
   const handleSubmit = () => {
     if (!form.title.trim()) return alert('숙제 내용을 입력해 주세요.')
     if (!form.repeat && !form.dueDate) return alert('마감일을 선택해 주세요.')
+    if (form.is_divisible && !form.unit) return alert('분할 단위(1회 최소 분)를 입력해 주세요.')
 
     const payload = {
       ...form,

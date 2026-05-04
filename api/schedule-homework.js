@@ -59,28 +59,39 @@ function getSchedulesForDate(schedules, dateStr) {
   })
 }
 
-// ── 가용 슬롯 계산 ───────────────────────────────────────────
-const HARD_DEADLINE = 22 * 60 + 30  // 22:30
+// ── 슬롯 설정 기본값 ─────────────────────────────────────────
+const DEFAULT_SLOT_SETTINGS = {
+  weekdaySlotStart: '16:00',
+  weekendSlotStart: '09:00',
+  hardDeadline:     '22:30',
+  dinnerStart:      '18:00',
+  dinnerEnd:        '19:00',
+}
 
-function calcAvailableSlots(schedules, googleEvents, dateStr) {
+// ── 가용 슬롯 계산 ───────────────────────────────────────────
+function calcAvailableSlots(schedules, googleEvents, dateStr, settings) {
+  const s        = { ...DEFAULT_SLOT_SETTINGS, ...settings }
   const weekend  = isWeekend(dateStr)
-  const dayStart = weekend ? 9 * 60 : 16 * 60
+  const dayStart    = timeToMinutes(weekend ? s.weekendSlotStart : s.weekdaySlotStart)
+  const hardDeadline = timeToMinutes(s.hardDeadline)
+  const dinnerStart  = timeToMinutes(s.dinnerStart)
+  const dinnerEnd    = timeToMinutes(s.dinnerEnd)
 
   const fixedBlocks = getSchedulesForDate(schedules, dateStr)
-    .filter(s => s.category !== 'mission')
-    .map(s => ({ start: timeToMinutes(s.startTime), end: timeToMinutes(s.endTime) }))
+    .filter(sc => sc.category !== 'mission')
+    .map(sc => ({ start: timeToMinutes(sc.startTime), end: timeToMinutes(sc.endTime) }))
 
   const gcBlocks = (googleEvents || [])
     .filter(e => e.date === dateStr && !e.allDay && e.startTime && e.endTime)
     .map(e => ({ start: timeToMinutes(e.startTime), end: timeToMinutes(e.endTime) }))
 
   const mealBlocks = weekend
-    ? [{ start: 12 * 60, end: 13 * 60 }, { start: 18 * 60, end: 19 * 60 }]
-    : [{ start: 18 * 60, end: 19 * 60 }]
+    ? [{ start: 12 * 60, end: 13 * 60 }, { start: dinnerStart, end: dinnerEnd }]
+    : [{ start: dinnerStart, end: dinnerEnd }]
 
   const allBlocks = [...fixedBlocks, ...gcBlocks, ...mealBlocks]
-    .filter(b => b.end > dayStart && b.start < HARD_DEADLINE)
-    .map(b => ({ start: Math.max(b.start, dayStart), end: Math.min(b.end, HARD_DEADLINE) }))
+    .filter(b => b.end > dayStart && b.start < hardDeadline)
+    .map(b => ({ start: Math.max(b.start, dayStart), end: Math.min(b.end, hardDeadline) }))
     .sort((a, b) => a.start - b.start)
 
   const slots = []
@@ -89,9 +100,9 @@ function calcAvailableSlots(schedules, googleEvents, dateStr) {
     if (block.start > cursor) slots.push({ start: cursor, end: block.start })
     cursor = Math.max(cursor, block.end)
   }
-  if (cursor < HARD_DEADLINE) slots.push({ start: cursor, end: HARD_DEADLINE })
+  if (cursor < hardDeadline) slots.push({ start: cursor, end: hardDeadline })
 
-  return slots.filter(s => s.end - s.start >= 10)
+  return slots.filter(sl => sl.end - sl.start >= 10)
 }
 
 // ── 학원 일정 맵 (exact + prefix 매칭 지원) ──────────────────
@@ -126,7 +137,7 @@ function getLinkedDates(linkedEvent, linkedEventMap) {
 }
 
 // ── 결정론적 스케줄러 ────────────────────────────────────────
-function runScheduler(homeworks, schedules, googleEvents, weekDates) {
+function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
   const blocks      = []
   const unscheduled = []
   const hwMap       = Object.fromEntries(homeworks.map(h => [h.id, h]))
@@ -153,7 +164,7 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
 
   function getRemaining(dateStr) {
     return subtractUsed(
-      calcAvailableSlots(schedules, googleEvents, dateStr),
+      calcAvailableSlots(schedules, googleEvents, dateStr, settings),
       dayUsed[dateStr] || []
     )
   }
@@ -238,11 +249,15 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates) {
       (!!fridayClassDate && (!hw.dueDate || hw.dueDate >= fridayClassDate))
 
     // fixed_d1 + linked_event: 수업 전날들만 (Rule B)
+    // D-1이 이번 주 범위 밖인 경우 (예: 월요일 수업 → D-1은 지난 주 일요일)
+    // → 이번 주에서 수업 전 가장 이른 날로 폴백
     if (hw.fixed_d1 && classDates.size > 0) {
-      return [...classDates]
-        .map(prevDay)
-        .filter(d => weekDates.includes(d))
-        .sort()
+      return [...classDates].flatMap(classDate => {
+        const d1 = prevDay(classDate)
+        if (weekDates.includes(d1)) return [d1]
+        const before = weekDates.filter(d => d < classDate)
+        return before.length > 0 ? [before[0]] : [classDate]
+      }).filter((d, i, arr) => arr.indexOf(d) === i).sort()
     }
 
     // fixed_d1만 (linked_event 없음): dueDate 당일만 (Rule B)
@@ -417,7 +432,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: '요청 body JSON 파싱 실패' })
   }
 
-  const { homeworks, schedules, googleEvents, weekStart } = body ?? {}
+  const { homeworks, schedules, googleEvents, weekStart, slotSettings } = body ?? {}
 
   if (!homeworks || !schedules || !weekStart) {
     return res.status(400).json({ error: 'homeworks, schedules, weekStart 필드가 필요합니다.' })
@@ -433,7 +448,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ blocks: [], unscheduled: [] })
     }
 
-    const { blocks, unscheduled } = runScheduler(backlog, schedules, googleEvents || [], weekDates)
+    const { blocks, unscheduled } = runScheduler(backlog, schedules, googleEvents || [], weekDates, slotSettings)
 
     console.log(`[schedule-homework] ✅ 배분 완료 — blocks: ${blocks.length}, unscheduled: ${unscheduled.length}`)
 

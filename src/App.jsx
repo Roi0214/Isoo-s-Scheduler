@@ -10,6 +10,7 @@ import SchedulePage from './pages/SchedulePage'
 import HomeworkPage from './pages/HomeworkPage'
 import WeeklyPage from './pages/WeeklyPage'
 import { syncRulesFromDB } from './data/aiRules'
+import { syncSlotSettingsFromDB } from './data/slotSettings'
 import './index.css'
 
 function PageRouter() {
@@ -22,7 +23,7 @@ function PageRouter() {
 }
 
 function AppShell() {
-  useEffect(() => { syncRulesFromDB() }, [])
+  useEffect(() => { syncRulesFromDB(); syncSlotSettingsFromDB() }, [])
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">

@@ -1,7 +1,8 @@
-import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical, RotateCcw, CheckSquare, Square, ListChecks, Settings2 } from 'lucide-react'
+import { Sparkles, AlertTriangle, RefreshCw, Trash2, ChevronDown, ChevronRight, FlaskConical, RotateCcw, CheckSquare, Square, ListChecks, Settings2, Clock } from 'lucide-react'
 import AIHomeworkBlock from './AIHomeworkBlock'
 import HomeworkFormModal from './HomeworkFormModal'
 import AIRulesModal from './AIRulesModal'
+import SlotSettingsModal from './SlotSettingsModal'
 import { useAISchedule } from '../../context/AIScheduleContext'
 import { useHomework } from '../../context/HomeworkContext'
 import { useSchedule } from '../../context/ScheduleContext'
@@ -9,6 +10,7 @@ import { useGCal } from '../../context/GoogleCalendarContext'
 import { getWeekDates, localDateStr } from '../../utils/weekUtils'
 import { useState } from 'react'
 import { loadRules, buildRulesText } from '../../data/aiRules'
+import { loadSlotSettings } from '../../data/slotSettings'
 
 const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -32,6 +34,8 @@ export default function TodayAITab() {
   const [listOpen, setListOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [rules, setRules] = useState(() => loadRules())
+  const [slotSettingsOpen, setSlotSettingsOpen] = useState(false)
+  const [slotSettings, setSlotSettings] = useState(() => loadSlotSettings())
 
   const now = new Date()
   const today = localDateStr(now)
@@ -44,10 +48,15 @@ export default function TodayAITab() {
     return (getEventsForDate(d) || []).map(e => ({ ...e, date: dateStr }))
   })
 
-  // ── 밀린 숙제 감지 ──────────────────────────────────────────
-  const pastIncomplete = aiSchedule?.blocks.filter(
-    b => b.date < today && !isCompleted(b.homework_id) && !b.rolledOver
-  ) ?? []
+  // ── 밀린 숙제 감지 (반복/분할은 날짜별 완료키 사용) ──────────
+  const pastIncomplete = aiSchedule?.blocks.filter(b => {
+    if (b.date >= today || b.rolledOver) return false
+    const hw = homeworks.find(h => h.id === b.homework_id)
+    const blockKey = (hw?.repeat || hw?.is_divisible)
+      ? `${b.homework_id}:${b.date}`
+      : b.homework_id
+    return !isCompleted(blockKey)
+  }) ?? []
 
   const handleRollover = () => {
     const count = redistributeIncomplete(today, isCompleted, homeworks)
@@ -61,7 +70,11 @@ export default function TodayAITab() {
       console.log('[TodayAITab] ⚠️ 생성 중 — 클릭 무시')
       return
     }
-    generateSchedule(homeworks, schedules, allGoogleEvents, weekMonday, buildRulesText(rules))
+    // Fix 1: 완료된 일반 숙제 제외 (반복/분할은 날짜별 완료이므로 모두 포함)
+    const hwsToSchedule = homeworks.filter(hw =>
+      (hw.repeat || hw.is_divisible) ? true : !isCompleted(hw.id)
+    )
+    generateSchedule(hwsToSchedule, schedules, allGoogleEvents, weekMonday, slotSettings)
   }
 
   const handleDummy = () => {
@@ -168,17 +181,20 @@ export default function TodayAITab() {
           더미 데이터로 UI 미리보기
         </button>
 
-        <button
-          onClick={() => setRulesOpen(true)}
-          className="flex items-center gap-1.5 text-xs text-slate-400 px-3 py-1.5 rounded-xl font-medium"
-        >
-          <Settings2 size={12} /> 배분 규칙 편집
-        </button>
-
-        <p className="text-xs text-slate-300 text-center leading-relaxed px-4">
-          Gemini 2.0 Flash Lite · 5대 규칙 적용<br />
-          (전날 완료·보카 복습·분할·난이도·수면 보호)
-        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSlotSettingsOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl font-medium"
+          >
+            <Clock size={12} /> 슬롯 설정
+          </button>
+          <button
+            onClick={() => setRulesOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-slate-400 px-3 py-1.5 rounded-xl font-medium"
+          >
+            <Settings2 size={12} /> 배분 규칙
+          </button>
+        </div>
       </div>
 
       {/* ── 전체 숙제 목록 (접이식) ─────────────────────────── */}
@@ -253,6 +269,12 @@ export default function TodayAITab() {
         rules={rules}
         onSave={setRules}
       />
+      <SlotSettingsModal
+        isOpen={slotSettingsOpen}
+        onClose={() => setSlotSettingsOpen(false)}
+        settings={slotSettings}
+        onSave={setSlotSettings}
+      />
       </>
     )
   }
@@ -282,18 +304,18 @@ export default function TodayAITab() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setRulesOpen(true)}
+            onClick={() => setSlotSettingsOpen(true)}
             className="flex items-center gap-1 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl font-semibold"
-            title="AI 배분 규칙 편집"
+            title="슬롯 설정"
           >
-            <Settings2 size={11} /> 규칙
+            <Clock size={11} /> 설정
           </button>
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
             className="flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <RefreshCw size={11} /> {isDummy ? 'AI 생성' : '재생성'}
+            <RefreshCw size={11} /> {isDummy ? '생성' : '재생성'}
           </button>
           <button
             onClick={clearSchedule}
@@ -489,6 +511,12 @@ export default function TodayAITab() {
         onClose={() => setRulesOpen(false)}
         rules={rules}
         onSave={setRules}
+      />
+      <SlotSettingsModal
+        isOpen={slotSettingsOpen}
+        onClose={() => setSlotSettingsOpen(false)}
+        settings={slotSettings}
+        onSave={setSlotSettings}
       />
     </div>
   )
