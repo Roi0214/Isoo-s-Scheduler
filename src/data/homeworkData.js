@@ -20,43 +20,13 @@ export const DIFFICULTY = {
   '하': { label: '하', color: 'bg-green-100 text-green-700' },
 }
 
-// 이번 주 특정 요일 날짜 반환 (0=일 ~ 6=토)
-function thisWeekDay(dayOfWeek) {
-  const today = new Date()
-  const currentDay = today.getDay()
-  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay
-  const monday = new Date(today)
-  monday.setDate(today.getDate() + mondayOffset)
-  const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-  const d = new Date(monday)
-  d.setDate(monday.getDate() + offset)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function relativeDate(offset) {
-  const d = new Date()
-  d.setDate(d.getDate() + offset)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
 export const HOMEWORKS = [
-
-  // ════════════════════════════════════════════════════════════
-  // 트윈클 (목요일 수업)
-  // ════════════════════════════════════════════════════════════
-
-  // 보카 1차: 픽션10개+논픽션10개, 2개당 20분 → 총 200분, 40분씩 분할
+  // ── 트윈클 논픽션 ────────────────────────────────────────
   {
     id: 'hw-twinkle-voca-1st',
     subject: 'english',
-    title: '트윈클 보카 1차 (픽션+논픽션 20개)',
-    dueDate: thisWeekDay(4),
+    title: '트윈클 논픽션 보카',
+    dueDate: '2026-05-11',
     priority: 'high',
     memo: '단어 2개당 20분, 총 20개(픽션10+논픽션10)=200분. 40분씩 5회 분산.',
     repeat: false,
@@ -67,15 +37,15 @@ export const HOMEWORKS = [
     is_divisible: true,
     unit: 40,
     total_units: 200,
-    linked_event: '트윈클',
+    linked_event: '트윈클 논픽션',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
   },
-
-  // 보카 2차: 시험 전날(D-1)에만 배치, Rule B 적용
   {
     id: 'hw-twinkle-voca-2nd',
     subject: 'english',
-    title: '트윈클 보카복습 2차 (D-1 전날 고정)',
-    dueDate: thisWeekDay(4),
+    title: '트윈클 논픽션 보카복습',
+    dueDate: '2026-05-11',
     priority: 'high',
     memo: '반드시 수업 전날(D-1)에만 배치. 60분. 앞당기기 금지.',
     repeat: false,
@@ -86,34 +56,34 @@ export const HOMEWORKS = [
     is_divisible: false,
     unit: null,
     total_units: null,
-    linked_event: '트윈클',
+    linked_event: '트윈클 논픽션',
+    fixed_d1: true,
+    linkedScheduleTitle: null,
   },
-
-  // 라이팅 픽션: 60분, 분할 불가
   {
     id: 'hw-twinkle-writing-fiction',
     subject: 'english',
     title: '트윈클 픽션 라이팅',
-    dueDate: thisWeekDay(4),
+    dueDate: '2026-05-06',
     priority: 'high',
     memo: '60분, 분할 불가',
     repeat: false,
     googleCalendarId: null,
-    status: 'backlog',
+    status: 'completed',
     difficulty: '중',
     estimated_minutes: 60,
     is_divisible: false,
     unit: null,
     total_units: null,
-    linked_event: '트윈클',
+    linked_event: '트윈클 픽션',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
   },
-
-  // 라이팅 논픽션: 60분, 분할 불가
   {
     id: 'hw-twinkle-writing-nonfiction',
     subject: 'english',
     title: '트윈클 논픽션 라이팅',
-    dueDate: thisWeekDay(4),
+    dueDate: '2026-05-11',
     priority: 'high',
     memo: '60분, 분할 불가',
     repeat: false,
@@ -124,17 +94,55 @@ export const HOMEWORKS = [
     is_divisible: false,
     unit: null,
     total_units: null,
-    linked_event: '트윈클',
+    linked_event: '트윈클 논픽션',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
   },
-
-  // ════════════════════════════════════════════════════════════
-  // 수학과외 복습 (2회 분할, 60분씩)
-  // ════════════════════════════════════════════════════════════
+  // ── 트윈클 픽션 ──────────────────────────────────────────
+  {
+    id: 'hw-1778138732210',
+    subject: 'english',
+    title: '픽션 보카',
+    dueDate: '2026-05-06',
+    priority: 'high',
+    memo: null,
+    repeat: false,
+    googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 200,
+    is_divisible: true,
+    unit: 40,
+    total_units: 200,
+    linked_event: '트윈클 픽션',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
+  },
+  {
+    id: 'hw-1778138774322',
+    subject: 'english',
+    title: '트윈클 픽션 보카복습',
+    dueDate: '2026-05-06',
+    priority: 'high',
+    memo: null,
+    repeat: false,
+    googleCalendarId: null,
+    status: 'backlog',
+    difficulty: '중',
+    estimated_minutes: 30,
+    is_divisible: false,
+    unit: null,
+    total_units: null,
+    linked_event: '트윈클 픽션',
+    fixed_d1: true,
+    linkedScheduleTitle: null,
+  },
+  // ── 수학과외 복습 ────────────────────────────────────────
   {
     id: 'hw-math-tutor-review',
     subject: 'math',
     title: '수학과외 복습',
-    dueDate: thisWeekDay(5),
+    dueDate: '2026-05-08',
     priority: 'high',
     memo: '총 2시간. 1시간씩 2회 분할 가능.',
     repeat: false,
@@ -147,15 +155,12 @@ export const HOMEWORKS = [
     total_units: 120,
     linked_event: '수학과외',
   },
-
-  // ════════════════════════════════════════════════════════════
-  // 영어 리딩 픽션 (주 1회, 2시간, 40분씩 분할 가능)
-  // ════════════════════════════════════════════════════════════
+  // ── 영어 리딩 ────────────────────────────────────────────
   {
     id: 'hw-english-reading-fiction',
     subject: 'english',
-    title: '영어리딩 픽션 (3~5챕터)',
-    dueDate: thisWeekDay(0),
+    title: '영어리딩 픽션리딩',
+    dueDate: '2026-05-06',
     priority: 'medium',
     memo: '총 2시간(3~5챕터 유동). 챕터 단위 분할 가능. 40분씩 3회 권장.',
     repeat: false,
@@ -166,89 +171,19 @@ export const HOMEWORKS = [
     is_divisible: true,
     unit: 40,
     total_units: 120,
-    linked_event: null,
+    linked_event: '트윈클 픽션',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
   },
-
-  // ════════════════════════════════════════════════════════════
-  // 연산 (주4~5회, 하루 1장, 15분, 우선순위 하)
-  // 시간 부족 시 스킵 가능 — AI가 여유 슬롯에만 배치
-  // ════════════════════════════════════════════════════════════
-  {
-    id: 'hw-calc-mon',
-    subject: 'math',
-    title: '연산 1장',
-    dueDate: thisWeekDay(1),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
-  {
-    id: 'hw-calc-tue',
-    subject: 'math',
-    title: '연산 1장',
-    dueDate: thisWeekDay(2),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
-  {
-    id: 'hw-calc-wed',
-    subject: 'math',
-    title: '연산 1장',
-    dueDate: thisWeekDay(3),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
-  {
-    id: 'hw-calc-thu',
-    subject: 'math',
-    title: '연산 1장',
-    dueDate: thisWeekDay(4),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
+  // ── 루틴 (매일/반복) ─────────────────────────────────────
   {
     id: 'hw-calc-fri',
     subject: 'math',
     title: '연산 1장',
-    dueDate: thisWeekDay(5),
+    dueDate: null,
     priority: 'low',
     memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
+    repeat: true,
     googleCalendarId: null,
     status: 'backlog',
     difficulty: '하',
@@ -257,88 +192,17 @@ export const HOMEWORKS = [
     unit: null,
     total_units: null,
     linked_event: '하윤네 수학',
-  },
-
-  // ════════════════════════════════════════════════════════════
-  // 단원평가 (주4~5회, 하루 1챕터, 15분, 우선순위 하)
-  // 시간 부족 시 스킵 가능 — AI가 여유 슬롯에만 배치
-  // ════════════════════════════════════════════════════════════
-  {
-    id: 'hw-chapter-mon',
-    subject: 'math',
-    title: '단원평가 1챕터',
-    dueDate: thisWeekDay(1),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
-  {
-    id: 'hw-chapter-tue',
-    subject: 'math',
-    title: '단원평가 1챕터',
-    dueDate: thisWeekDay(2),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
-  {
-    id: 'hw-chapter-wed',
-    subject: 'math',
-    title: '단원평가 1챕터',
-    dueDate: thisWeekDay(3),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
-  },
-  {
-    id: 'hw-chapter-thu',
-    subject: 'math',
-    title: '단원평가 1챕터',
-    dueDate: thisWeekDay(4),
-    priority: 'low',
-    memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
-    googleCalendarId: null,
-    status: 'backlog',
-    difficulty: '하',
-    estimated_minutes: 15,
-    is_divisible: false,
-    unit: null,
-    total_units: null,
-    linked_event: '하윤네 수학',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
   },
   {
     id: 'hw-chapter-fri',
     subject: 'math',
     title: '단원평가 1챕터',
-    dueDate: thisWeekDay(5),
+    dueDate: null,
     priority: 'low',
     memo: '주4~5회 목표. 시간 부족 시 스킵 가능. 10~20분.',
-    repeat: false,
+    repeat: true,
     googleCalendarId: null,
     status: 'backlog',
     difficulty: '하',
@@ -347,16 +211,14 @@ export const HOMEWORKS = [
     unit: null,
     total_units: null,
     linked_event: '하윤네 수학',
+    fixed_d1: false,
+    linkedScheduleTitle: null,
   },
-
-  // ════════════════════════════════════════════════════════════
-  // 구몬 (매일 등교 전, 15분)
-  // ════════════════════════════════════════════════════════════
   {
     id: 'hw-gummon-daily',
     subject: 'mission',
     title: '구몬 (등교 전)',
-    dueDate: relativeDate(0),
+    dueDate: null,
     priority: 'high',
     memo: '매일 등교 전 10~15분. 반드시 완료.',
     repeat: true,
@@ -369,15 +231,12 @@ export const HOMEWORKS = [
     total_units: null,
     linked_event: null,
   },
-
-  // ════════════════════════════════════════════════════════════
-  // 비문학 책읽기 (주1회 이상, 2시간, 우선순위 하)
-  // ════════════════════════════════════════════════════════════
+  // ── 비문학 책읽기 ────────────────────────────────────────
   {
     id: 'hw-nonfiction-reading',
     subject: 'reading',
     title: '비문학 책읽기',
-    dueDate: thisWeekDay(0),
+    dueDate: '2026-05-10',
     priority: 'low',
     memo: '최소 주1회. 2시간. 시간 부족 시 횟수 줄여도 됨.',
     repeat: false,

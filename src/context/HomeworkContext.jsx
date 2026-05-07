@@ -46,16 +46,26 @@ export function HomeworkProvider({ children }) {
   }, [])
 
   // ── 숙제 변경 → localStorage + Supabase 저장 ───────────
+  // dbLoaded=false(마운트 시)에는 타임스탬프를 건드리지 않아야
+  // dbLoad가 Supabase 데이터를 로컬보다 신규로 인식할 수 있음
   useEffect(() => {
-    localSave('homeworks', homeworks)
-    if (dbLoaded) dbSave('homeworks', homeworks)
+    if (dbLoaded) {
+      localSave('homeworks', homeworks)
+      dbSave('homeworks', homeworks)
+    } else {
+      localStorage.setItem('kid-scheduler:homeworks', JSON.stringify(homeworks))
+    }
   }, [homeworks, dbLoaded])
 
   // ── 완료 상태 변경 → localStorage + Supabase 저장 ───────
   useEffect(() => {
     const arr = [...completedSet]
-    localSave('hwCompleted', arr)
-    if (dbLoaded) dbSave('hwCompleted', arr)
+    if (dbLoaded) {
+      localSave('hwCompleted', arr)
+      dbSave('hwCompleted', arr)
+    } else {
+      localStorage.setItem('kid-scheduler:hwCompleted', JSON.stringify(arr))
+    }
   }, [completedSet, dbLoaded])
 
   // ── 학원 연동 숙제 자동 재활성화 ────────────────────────
@@ -74,6 +84,8 @@ export function HomeworkProvider({ children }) {
 
         const nextClass = findNextClassDate(hw.linked_event, schedules)
         if (!nextClass) return hw
+        // 수업이 오늘이면 건너뜀 → 내일 앱 열 때 다음 주차로 갱신됨
+        if (nextClass <= today) return hw
 
         const newDueDate = prevDayStr(nextClass)
         if (newDueDate === hw.dueDate) return hw

@@ -4,10 +4,10 @@ import { useCurrentTime } from '../../hooks/useCurrentTime'
 import { useSchedule } from '../../context/ScheduleContext'
 import { useGCal } from '../../context/GoogleCalendarContext'
 
-const HOUR_HEIGHT  = 64
+const HOUR_HEIGHT  = 72
 const START_HOUR   = 9
 const END_HOUR     = 22
-const TIME_WIDTH   = 34
+const TIME_WIDTH   = 36
 
 const TOTAL_HOURS  = END_HOUR - START_HOUR
 const TOTAL_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT
@@ -99,7 +99,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
               className="absolute w-full flex justify-end pr-1"
               style={{ top: i * HOUR_HEIGHT - 7 }}
             >
-              <span className="text-[10px] text-slate-400 font-medium leading-none">
+              <span className="text-[11px] text-slate-400 font-medium leading-none">
                 {hourLabel(START_HOUR + i)}
               </span>
             </div>
@@ -160,13 +160,13 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                 const colors = cat
                   ? { bg: cat.blockBg, border: cat.blockBorder, text: cat.blockText }
                   : FALLBACK_COLOR
-                const showTime = height >= 48
+                const showTime = height >= 44
 
                 return (
                   <button
                     key={s.id}
                     onClick={() => onBlockClick(s, date)}
-                    className="absolute rounded-lg overflow-hidden flex flex-col items-center justify-center text-center px-0.5 active:opacity-70 transition-opacity"
+                    className="absolute rounded-lg overflow-hidden flex flex-col items-center justify-center text-center px-1 active:opacity-70 transition-opacity"
                     style={{
                       top: top + 1,
                       height: height - 2,
@@ -181,10 +181,10 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                       className="font-bold leading-tight w-full text-center"
                       style={{
                         color: colors.text,
-                        fontSize: height >= 50 ? '11px' : '10px',
-                        whiteSpace: height >= 60 ? 'normal' : 'nowrap',
+                        fontSize: height >= 54 ? '13px' : '11px',
+                        whiteSpace: height >= 54 ? 'normal' : 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: height >= 60 ? 'clip' : 'ellipsis',
+                        textOverflow: height >= 54 ? 'clip' : 'ellipsis',
                       }}
                     >
                       {s.title}
@@ -192,7 +192,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                     {showTime && (
                       <p
                         className="mt-0.5 leading-none text-center w-full"
-                        style={{ color: colors.border, fontSize: '9px' }}
+                        style={{ color: colors.border, fontSize: '10px' }}
                       >
                         {fmt12(s.startTime)}~{fmt12(s.endTime)}
                       </p>

@@ -23,8 +23,12 @@ export function ScheduleProvider({ children }) {
   )
 
   useEffect(() => {
-    localSave('categoryMap', categoryMap)
-    if (dbLoaded) dbSave('categoryMap', categoryMap)
+    if (dbLoaded) {
+      localSave('categoryMap', categoryMap)
+      dbSave('categoryMap', categoryMap)
+    } else {
+      localStorage.setItem('kid-scheduler:categoryMap', JSON.stringify(categoryMap))
+    }
   }, [categoryMap, dbLoaded])
 
   // color/dot 포함된 완성형 분류 객체 (메모이제이션)
@@ -52,8 +56,12 @@ export function ScheduleProvider({ children }) {
   )
 
   useEffect(() => {
-    localSave('schedules', schedules)
-    if (dbLoaded) dbSave('schedules', schedules)
+    if (dbLoaded) {
+      localSave('schedules', schedules)
+      dbSave('schedules', schedules)
+    } else {
+      localStorage.setItem('kid-scheduler:schedules', JSON.stringify(schedules))
+    }
   }, [schedules, dbLoaded])
 
   const addSchedule = useCallback((item) => {
@@ -114,8 +122,12 @@ export function ScheduleProvider({ children }) {
   )
 
   useEffect(() => {
-    localSave('scheduleCompleted', completedMap)
-    if (dbLoaded) dbSave('scheduleCompleted', completedMap)
+    if (dbLoaded) {
+      localSave('scheduleCompleted', completedMap)
+      dbSave('scheduleCompleted', completedMap)
+    } else {
+      localStorage.setItem('kid-scheduler:scheduleCompleted', JSON.stringify(completedMap))
+    }
   }, [completedMap, dbLoaded])
 
   // ── Supabase 초기 로드 ───────────────────────────

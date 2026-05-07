@@ -63,7 +63,7 @@ export const SCHEDULES = [
     title: '학교',
     startTime: '09:00',
     endTime: '13:40',
-    days: [1, 2, 3, 5],   // 월, 화, 수, 금
+    days: [1, 2, 3, 5],
     category: 'school',
     exceptions: [],
     googleCalendarId: null,
@@ -73,7 +73,7 @@ export const SCHEDULES = [
     title: '학교',
     startTime: '09:00',
     endTime: '14:30',
-    days: [4],             // 목
+    days: [4],
     category: 'school',
     exceptions: [],
     googleCalendarId: null,
@@ -98,6 +98,7 @@ export const SCHEDULES = [
     category: 'math',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-03',
   },
   {
     id: 'math-tutor-mon',
@@ -129,6 +130,7 @@ export const SCHEDULES = [
     category: 'science',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-04',
   },
   // ── 수요일 ─────────────────────────────────────────────
   {
@@ -140,12 +142,36 @@ export const SCHEDULES = [
     category: 'english',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-05',
   },
   {
     id: 'hayoon-math-wed',
     title: '하윤네 수학',
     startTime: '16:30',
     endTime: '17:30',
+    days: [3],
+    category: 'math',
+    exceptions: [],
+    googleCalendarId: null,
+    effectiveTo: '2026-05-05',
+  },
+  {
+    id: 'schedule-1778138872251',
+    title: '와이즈만',
+    startTime: '15:00',
+    endTime: '17:00',
+    days: [3],
+    category: 'science',
+    exceptions: [],
+    googleCalendarId: null,
+    effectiveFrom: '2026-05-05',
+    effectiveTo: null,
+  },
+  {
+    id: 'schedule-1778138897824',
+    title: '구몬',
+    startTime: '18:40',
+    endTime: '19:00',
     days: [3],
     category: 'math',
     exceptions: [],
@@ -192,8 +218,9 @@ export const SCHEDULES = [
     category: 'math',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-07',
   },
-  // ── 등교 전 미션 (매일) ─────────────────────────────────
+  // ── 등교 전 미션 ────────────────────────────────────────
   {
     id: 'mission-gummon',
     title: '등교 전 구몬',
@@ -203,46 +230,51 @@ export const SCHEDULES = [
     category: 'mission',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-03',
   },
   {
     id: 'mission-nonfiction-voca',
     title: '논픽션 보카 암기',
     startTime: '07:50',
     endTime: '08:10',
-    days: [1, 5],   // 월, 금
+    days: [1, 5],
     category: 'mission',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-03',
   },
   {
     id: 'mission-fiction-voca',
     title: '픽션 보카 암기',
     startTime: '07:50',
     endTime: '08:10',
-    days: [3],      // 수
+    days: [3],
     category: 'mission',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-05',
   },
   {
     id: 'mission-nonfiction-writing',
     title: '논픽션 라이팅',
     startTime: '07:50',
     endTime: '08:10',
-    days: [5],      // 금
+    days: [5],
     category: 'mission',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-07',
   },
   {
     id: 'mission-wiseman-science',
     title: '오투과학 & 과학일기',
     startTime: '07:50',
     endTime: '08:10',
-    days: [4],      // 목
+    days: [4],
     category: 'mission',
     exceptions: [],
     googleCalendarId: null,
+    effectiveTo: '2026-05-06',
   },
 ]
 
