@@ -3,7 +3,6 @@ import { Trash2, CalendarClock, Scissors, Wand2 } from 'lucide-react'
 import Modal from '../common/Modal'
 import { HW_SUBJECTS, PRIORITY, DIFFICULTY } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
-import { useAISchedule } from '../../context/AIScheduleContext'
 import { useSchedule } from '../../context/ScheduleContext'
 import { findNextClassDate, prevDayStr } from '../../utils/scheduleUtils'
 
@@ -41,7 +40,6 @@ const EMPTY_FORM = {
 
 export default function HomeworkFormModal({ isOpen, onClose, editItem = null, prefill = null }) {
   const { addHomework, updateHomework, deleteHomework } = useHomework()
-  const { removeBlocksByHomeworkId, syncUpdatedHomework } = useAISchedule()
   const { schedules } = useSchedule()
   const isEdit = !!editItem
 
@@ -141,7 +139,6 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
     }
     if (isEdit) {
       updateHomework(editItem.id, payload)
-      syncUpdatedHomework({ id: editItem.id, title: payload.title, subject: payload.subject })
     } else {
       addHomework(payload)
     }
@@ -149,7 +146,6 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
   }
 
   const handleDelete = () => {
-    removeBlocksByHomeworkId(editItem.id)
     deleteHomework(editItem.id)
     resetAndClose()
   }
