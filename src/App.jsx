@@ -1,16 +1,12 @@
-import { useEffect } from 'react'
 import { AppProvider, useApp, TABS } from './context/AppContext'
 import { ScheduleProvider } from './context/ScheduleContext'
 import { HomeworkProvider } from './context/HomeworkContext'
 import { GoogleCalendarProvider } from './context/GoogleCalendarContext'
-import { AIScheduleProvider } from './context/AIScheduleContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import SchedulePage from './pages/SchedulePage'
 import HomeworkPage from './pages/HomeworkPage'
 import WeeklyPage from './pages/WeeklyPage'
-import { syncRulesFromDB } from './data/aiRules'
-import { syncSlotSettingsFromDB } from './data/slotSettings'
 import './index.css'
 
 function PageRouter() {
@@ -23,8 +19,6 @@ function PageRouter() {
 }
 
 function AppShell() {
-  useEffect(() => { syncRulesFromDB(); syncSlotSettingsFromDB() }, [])
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Header />
@@ -42,9 +36,7 @@ export default function App() {
       <ScheduleProvider>
         <HomeworkProvider>
           <GoogleCalendarProvider>
-            <AIScheduleProvider>
-              <AppShell />
-            </AIScheduleProvider>
+            <AppShell />
           </GoogleCalendarProvider>
         </HomeworkProvider>
       </ScheduleProvider>

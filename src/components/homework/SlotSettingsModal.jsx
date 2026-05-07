@@ -3,7 +3,6 @@ import { X } from 'lucide-react'
 import { DEFAULT_SLOT_SETTINGS, saveSlotSettings } from '../../data/slotSettings'
 
 const FIELDS = [
-  { key: 'weekdaySlotStart', label: '평일 공부 시작', desc: '학교 수업 후 공부 가능 시각' },
   { key: 'weekendSlotStart', label: '주말 공부 시작', desc: '주말·공휴일 공부 시작 시각' },
   { key: 'hardDeadline',     label: '취침 시간',      desc: '이 시각 이후는 절대 배치 안 함' },
   { key: 'dinnerStart',      label: '저녁 식사 시작', desc: null },
@@ -45,7 +44,7 @@ export default function SlotSettingsModal({ isOpen, onClose, settings, onSave })
           </button>
         </div>
         <p className="text-xs text-slate-400 mb-4">
-          실제 일과에 맞게 조정하면 배분 정확도가 높아집니다.
+          평일 공부 시간은 등록된 학원·수업 일정에서 자동 계산됩니다.
         </p>
 
         <div className="divide-y divide-slate-100">

@@ -5,8 +5,7 @@
 import { dbLoad, dbSave, localSave } from '../lib/db'
 
 export const DEFAULT_SLOT_SETTINGS = {
-  weekdaySlotStart: '16:00',   // 평일 공부 시작
-  weekendSlotStart: '09:00',   // 주말 공부 시작
+  weekendSlotStart: '09:00',   // 주말 공부 시작 (평일은 학원 일정으로 자동 계산)
   hardDeadline:     '22:30',   // 취침 시간 (이후 절대 배치 금지)
   dinnerStart:      '18:00',   // 저녁 식사 시작
   dinnerEnd:        '19:00',   // 저녁 식사 종료

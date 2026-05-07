@@ -61,8 +61,7 @@ function getSchedulesForDate(schedules, dateStr) {
 
 // ── 슬롯 설정 기본값 ─────────────────────────────────────────
 const DEFAULT_SLOT_SETTINGS = {
-  weekdaySlotStart: '16:00',
-  weekendSlotStart: '09:00',
+  weekendSlotStart: '09:00',   // 주말 공부 시작 (평일은 학원 일정으로 자동 계산)
   hardDeadline:     '22:30',
   dinnerStart:      '18:00',
   dinnerEnd:        '19:00',
@@ -72,7 +71,9 @@ const DEFAULT_SLOT_SETTINGS = {
 function calcAvailableSlots(schedules, googleEvents, dateStr, settings) {
   const s        = { ...DEFAULT_SLOT_SETTINGS, ...settings }
   const weekend  = isWeekend(dateStr)
-  const dayStart    = timeToMinutes(weekend ? s.weekendSlotStart : s.weekdaySlotStart)
+  // 평일: 14:00부터 탐색 (학교 등교 후 귀가 시간대 고려, 학원 블록이 이후 시간 자동 차단)
+  // 주말: weekendSlotStart 기준 (아침 늦잠 고려)
+  const dayStart    = timeToMinutes(weekend ? s.weekendSlotStart : '14:00')
   const hardDeadline = timeToMinutes(s.hardDeadline)
   const dinnerStart  = timeToMinutes(s.dinnerStart)
   const dinnerEnd    = timeToMinutes(s.dinnerEnd)
@@ -120,16 +121,19 @@ function buildLinkedEventMap(schedules, weekDates) {
 /**
  * linked_event 문자열로 수업 날짜 목록 조회.
  * - 정확히 일치하는 스케줄 제목 우선
- * - 없으면 스케줄 제목이 linked_event로 시작하는 것 모두 수집
- *   (예: '트윈클' → '트윈클 픽션', '트윈클 논픽션' 포함)
+ * - 없으면 토큰 기반 매칭: linked_event의 모든 단어가 스케줄 제목에 포함되면 일치
+ *   (scheduleUtils.js findNextClassDate 와 동일 알고리즘)
+ *   예: '트윈클' → '영어 트윈클 픽션', '트윈클 보카' 모두 매칭
  */
 function getLinkedDates(linkedEvent, linkedEventMap) {
   if (!linkedEvent) return []
   if (linkedEventMap[linkedEvent]) return linkedEventMap[linkedEvent]
 
+  const queryTokens = linkedEvent.toLowerCase().split(/\s+/).filter(Boolean)
   const dates = new Set()
   for (const [title, dateList] of Object.entries(linkedEventMap)) {
-    if (title.startsWith(linkedEvent)) {
+    const titleTokens = title.toLowerCase().split(/\s+/)
+    if (queryTokens.every(kw => titleTokens.some(t => t === kw))) {
       dateList.forEach(d => dates.add(d))
     }
   }
@@ -232,8 +236,10 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
     if (targetDate) return weekDates.includes(targetDate) ? [targetDate] : []
 
     const classDates  = new Set(getLinkedDates(hw.linked_event, linkedEventMap))
-    // 토/일은 항상 보충·선행 배치 가능 (수업날 제외)
-    const weekendDays = weekDates.filter(d => isWeekend(d) && !classDates.has(d))
+    // 토/일은 보충·선행 배치 가능 (수업날 제외, dueDate 이내)
+    const weekendDays = weekDates.filter(d =>
+      isWeekend(d) && !classDates.has(d) && (!hw.dueDate || d <= hw.dueDate)
+    )
 
     // ── 주말 우선 배치 조건 ──────────────────────────────────
     // 1) 차주 이후 마감: 이번 주 토/일에 미리 처리하는 것이 자연스러움
@@ -373,9 +379,24 @@ function runScheduler(homeworks, schedules, googleEvents, weekDates, settings) {
   const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
 
   // 1단계: fixed_d1 (가장 제약이 강함, Rule B)
+  // 수업이 주 2회 이상인 경우 각 D-1에 개별 블록 배치 (scheduleOne 한 번 → 첫 날만 배치되는 문제 방지)
   const fixed_d1Hws = homeworks.filter(hw => hw.fixed_d1 && !hw.repeat)
   fixed_d1Hws.sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-  for (const hw of fixed_d1Hws) scheduleOne(hw, null)
+  for (const hw of fixed_d1Hws) {
+    const classDates = getLinkedDates(hw.linked_event, linkedEventMap)
+    if (classDates.length > 1) {
+      // 각 수업 날짜의 D-1에 개별 배치
+      for (const classDate of classDates) {
+        const d1 = prevDay(classDate)
+        const targetDate = weekDates.includes(d1)
+          ? d1
+          : (weekDates.filter(d => d < classDate).sort().pop() || classDate)
+        scheduleOne(hw, targetDate)
+      }
+    } else {
+      scheduleOne(hw, null)
+    }
+  }
 
   // 2단계: repeat=daily (날짜 지정, Rule G)
   const repeatEntries = []
