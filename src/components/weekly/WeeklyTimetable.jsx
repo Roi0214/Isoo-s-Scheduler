@@ -191,10 +191,10 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                     </p>
                     {showTime && (
                       <p
-                        className="mt-0.5 leading-none text-center w-full"
+                        className="mt-0.5 leading-tight text-center w-full"
                         style={{ color: colors.border, fontSize: '10px' }}
                       >
-                        {fmt12(s.startTime)}~{fmt12(s.endTime)}
+                        {fmt12(s.startTime)}~<br />{fmt12(s.endTime)}
                       </p>
                     )}
                   </button>
