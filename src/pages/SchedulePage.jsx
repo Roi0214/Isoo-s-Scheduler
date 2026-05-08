@@ -5,6 +5,7 @@ import ScheduleItem from '../components/schedule/ScheduleItem'
 import ExternalEventItem from '../components/schedule/ExternalEventItem'
 import ScheduleFormModal from '../components/schedule/ScheduleFormModal'
 import HomeworkFormModal from '../components/homework/HomeworkFormModal'
+import DailyMemo from '../components/schedule/DailyMemo'
 import { getSchedulesForDate, CATEGORIES } from '../data/scheduleData'
 import { useSchedule } from '../context/ScheduleContext'
 import { useGCal } from '../context/GoogleCalendarContext'
@@ -192,6 +193,9 @@ export default function SchedulePage() {
           })}
         </div>
       )}
+
+      {/* 일별 메모 */}
+      <DailyMemo dateStr={dateStr} />
 
       {/* FAB */}
       <button

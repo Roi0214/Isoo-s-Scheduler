@@ -2,6 +2,7 @@ import { AppProvider, useApp, TABS } from './context/AppContext'
 import { ScheduleProvider } from './context/ScheduleContext'
 import { HomeworkProvider } from './context/HomeworkContext'
 import { GoogleCalendarProvider } from './context/GoogleCalendarContext'
+import { MemoProvider } from './context/MemoContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import SchedulePage from './pages/SchedulePage'
@@ -36,7 +37,9 @@ export default function App() {
       <ScheduleProvider>
         <HomeworkProvider>
           <GoogleCalendarProvider>
-            <AppShell />
+            <MemoProvider>
+              <AppShell />
+            </MemoProvider>
           </GoogleCalendarProvider>
         </HomeworkProvider>
       </ScheduleProvider>
