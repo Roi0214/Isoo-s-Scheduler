@@ -4,11 +4,10 @@ import { useCurrentTime } from '../../hooks/useCurrentTime'
 import { useSchedule } from '../../context/ScheduleContext'
 import { useGCal } from '../../context/GoogleCalendarContext'
 
-const HOUR_HEIGHT    = 72
-const START_HOUR     = 9
-const END_HOUR       = 22
-const TIME_WIDTH     = 32          // 시간축 너비 (px)
-const COL_MIN_WIDTH  = 68          // 요일 열 최소 너비 (px) — 화면 밖으로 넘어가 스크롤 유도
+const HOUR_HEIGHT  = 72
+const START_HOUR   = 9
+const END_HOUR     = 22
+const TIME_WIDTH   = 20          // 시간축 너비 축소 (기존 36 → 20)
 
 const TOTAL_HOURS  = END_HOUR - START_HOUR
 const TOTAL_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT
@@ -48,182 +47,162 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
   const nowTop = ((now.getHours() - START_HOUR) + now.getMinutes() / 60) * HOUR_HEIGHT
   const showNowLine = isCurrentWeek && nowTop >= 0 && nowTop <= TOTAL_HEIGHT
 
-  // 전체 너비: 시간축 + 5열 최소 너비
-  const minWidth = TIME_WIDTH + weekdays.length * COL_MIN_WIDTH
-
   return (
-    /* -mx-4 로 부모 padding 상쇄 → 화면 끝까지 스크롤 영역 확보 */
-    <div className="overflow-x-auto -mx-4 scrollbar-hide">
-      <div style={{ minWidth, paddingLeft: 16, paddingRight: 16, boxSizing: 'border-box' }}>
+    <div className="w-full">
 
-        {/* ── 요일 헤더 ─────────────────── */}
-        <div className="flex bg-slate-50 pb-2">
-          {/* 시간축 자리 spacer (sticky) */}
-          <div
-            className="flex-shrink-0 bg-slate-50"
-            style={{ width: TIME_WIDTH, position: 'sticky', left: 16 }}
-          />
-          {weekdays.map((date, idx) => {
-            const isToday   = isSameDay(date, today)
-            const isHoliday = getAllDayForDate(date).length > 0
-            const holidayName = isHoliday ? getAllDayForDate(date)[0].title : null
+      {/* ── 요일 헤더 ─────────────────── */}
+      <div className="flex bg-slate-50 pb-2">
+        <div style={{ width: TIME_WIDTH }} className="flex-shrink-0" />
+        {weekdays.map((date, idx) => {
+          const isToday   = isSameDay(date, today)
+          const isHoliday = getAllDayForDate(date).length > 0
+          const holidayName = isHoliday ? getAllDayForDate(date)[0].title : null
 
-            return (
-              <div
-                key={idx}
-                className={`flex flex-col items-center py-1.5 rounded-xl mx-0.5
-                  ${isToday   ? 'bg-indigo-600' :
-                    isHoliday ? 'bg-red-100'    : ''}`}
-                style={{ minWidth: COL_MIN_WIDTH, flex: `0 0 ${COL_MIN_WIDTH}px` }}
-              >
-                <span className={`text-xs font-bold
-                  ${isToday   ? 'text-indigo-200' :
-                    isHoliday ? 'text-red-500'    : 'text-slate-400'}`}>
-                  {WEEKDAY_LABELS[idx]}
+          return (
+            <div
+              key={idx}
+              className={`flex-1 flex flex-col items-center py-1.5 rounded-xl mx-0.5
+                ${isToday   ? 'bg-indigo-600' :
+                  isHoliday ? 'bg-red-100'    : ''}`}
+            >
+              <span className={`text-xs font-bold
+                ${isToday   ? 'text-indigo-200' :
+                  isHoliday ? 'text-red-500'    : 'text-slate-400'}`}>
+                {WEEKDAY_LABELS[idx]}
+              </span>
+              <span className={`text-sm font-extrabold leading-none
+                ${isToday   ? 'text-white'    :
+                  isHoliday ? 'text-red-600'  : 'text-slate-700'}`}>
+                {date.getDate()}
+              </span>
+              {isHoliday && !isToday && (
+                <span className="text-[8px] text-red-400 font-medium leading-tight mt-0.5 text-center px-0.5 truncate w-full text-center">
+                  {holidayName}
                 </span>
-                <span className={`text-sm font-extrabold leading-none
-                  ${isToday   ? 'text-white'    :
-                    isHoliday ? 'text-red-600'  : 'text-slate-700'}`}>
-                  {date.getDate()}
-                </span>
-                {isHoliday && !isToday && (
-                  <span className="text-[8px] text-red-400 font-medium leading-tight mt-0.5 text-center px-0.5 truncate w-full text-center">
-                    {holidayName}
-                  </span>
-                )}
-              </div>
-            )
-          })}
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── 그리드 본체 ───────────────── */}
+      <div className="flex relative">
+
+        {/* 시간 레이블 */}
+        <div
+          className="flex-shrink-0 bg-slate-50 relative"
+          style={{ width: TIME_WIDTH, height: TOTAL_HEIGHT }}
+        >
+          {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => (
+            <div
+              key={i}
+              className="absolute w-full flex justify-end"
+              style={{ top: i * HOUR_HEIGHT - 7 }}
+            >
+              <span className="text-[10px] text-slate-400 font-medium leading-none">
+                {hourLabel(START_HOUR + i)}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {/* ── 그리드 본체 ───────────────── */}
-        <div className="flex relative">
+        {/* 요일 열 */}
+        {weekdays.map((date, dayIdx) => {
+          const isToday      = isSameDay(date, today)
+          const isHoliday    = getAllDayForDate(date).length > 0
+          const daySchedules = getSchedulesForDate(schedules, date)
+            .filter(s => s.category !== 'mission')
 
-          {/* 시간 레이블 (sticky) */}
-          <div
-            className="flex-shrink-0 bg-slate-50 relative z-10"
-            style={{
-              width: TIME_WIDTH,
-              height: TOTAL_HEIGHT,
-              position: 'sticky',
-              left: 16,
-            }}
-          >
-            {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => (
-              <div
-                key={i}
-                className="absolute w-full flex justify-end pr-1"
-                style={{ top: i * HOUR_HEIGHT - 7 }}
-              >
-                <span className="text-[11px] text-slate-400 font-medium leading-none">
-                  {hourLabel(START_HOUR + i)}
-                </span>
-              </div>
-            ))}
-          </div>
+          return (
+            <div
+              key={dayIdx}
+              className="flex-1 relative border-l border-slate-100 mx-0.5"
+              style={{ height: TOTAL_HEIGHT }}
+            >
+              {/* 시간 구분선 */}
+              {Array.from({ length: TOTAL_HOURS }, (_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-full"
+                  style={{
+                    top: i * HOUR_HEIGHT,
+                    borderTop: i === 0 ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
+                  }}
+                />
+              ))}
 
-          {/* 요일 열 */}
-          {weekdays.map((date, dayIdx) => {
-            const isToday      = isSameDay(date, today)
-            const isHoliday    = getAllDayForDate(date).length > 0
-            const daySchedules = getSchedulesForDate(schedules, date)
-              .filter(s => s.category !== 'mission')
+              {/* 공휴일 배경 */}
+              {isHoliday && !isToday && (
+                <div className="absolute inset-0 bg-red-50/60 pointer-events-none" />
+              )}
 
-            return (
-              <div
-                key={dayIdx}
-                className="relative border-l border-slate-100 mx-0.5"
-                style={{
-                  minWidth: COL_MIN_WIDTH,
-                  flex: `0 0 ${COL_MIN_WIDTH}px`,
-                  height: TOTAL_HEIGHT,
-                }}
-              >
-                {/* 시간 구분선 */}
-                {Array.from({ length: TOTAL_HOURS }, (_, i) => (
-                  <div
-                    key={i}
-                    className="absolute w-full"
+              {/* 오늘 배경 */}
+              {isToday && <div className="absolute inset-0 bg-indigo-50/50 pointer-events-none" />}
+
+              {/* 현재 시간 선 */}
+              {isToday && showNowLine && (
+                <div
+                  className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
+                  style={{ top: nowTop }}
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" style={{ marginLeft: -5 }} />
+                  <div className="flex-1 border-t-2 border-red-400" />
+                </div>
+              )}
+
+              {/* 일정 블록 */}
+              {daySchedules.map(s => {
+                const top    = timeToTop(s.startTime)
+                const height = timeToHeight(s.startTime, s.endTime)
+                if (top > TOTAL_HEIGHT || top + height < 0) return null
+
+                const cat    = categories[s.category]
+                const colors = cat
+                  ? { bg: cat.blockBg, border: cat.blockBorder, text: cat.blockText }
+                  : FALLBACK_COLOR
+                const showTime = height >= 44
+
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => onBlockClick(s, date)}
+                    className="absolute rounded-lg overflow-hidden flex flex-col items-center justify-center text-center px-1 active:opacity-70 transition-opacity"
                     style={{
-                      top: i * HOUR_HEIGHT,
-                      borderTop: i === 0 ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
+                      top: top + 1,
+                      height: height - 2,
+                      left: 2,
+                      right: 2,
+                      width: 'calc(100% - 4px)',
+                      backgroundColor: colors.bg,
+                      borderLeft: `3px solid ${colors.border}`,
                     }}
-                  />
-                ))}
-
-                {/* 공휴일 배경 */}
-                {isHoliday && !isToday && (
-                  <div className="absolute inset-0 bg-red-50/60 pointer-events-none" />
-                )}
-
-                {/* 오늘 배경 */}
-                {isToday && <div className="absolute inset-0 bg-indigo-50/50 pointer-events-none" />}
-
-                {/* 현재 시간 선 */}
-                {isToday && showNowLine && (
-                  <div
-                    className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
-                    style={{ top: nowTop }}
                   >
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" style={{ marginLeft: -5 }} />
-                    <div className="flex-1 border-t-2 border-red-400" />
-                  </div>
-                )}
-
-                {/* 일정 블록 */}
-                {daySchedules.map(s => {
-                  const top    = timeToTop(s.startTime)
-                  const height = timeToHeight(s.startTime, s.endTime)
-                  if (top > TOTAL_HEIGHT || top + height < 0) return null
-
-                  const cat    = categories[s.category]
-                  const colors = cat
-                    ? { bg: cat.blockBg, border: cat.blockBorder, text: cat.blockText }
-                    : FALLBACK_COLOR
-                  const showTime = height >= 44
-
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => onBlockClick(s, date)}
-                      className="absolute rounded-lg overflow-hidden flex flex-col items-center justify-center text-center px-1 active:opacity-70 transition-opacity"
+                    <p
+                      className="font-bold leading-tight w-full text-center"
                       style={{
-                        top: top + 1,
-                        height: height - 2,
-                        left: 2,
-                        right: 2,
-                        width: 'calc(100% - 4px)',
-                        backgroundColor: colors.bg,
-                        borderLeft: `3px solid ${colors.border}`,
+                        color: colors.text,
+                        fontSize: height >= 54 ? '13px' : '11px',
+                        whiteSpace: height >= 54 ? 'normal' : 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: height >= 54 ? 'clip' : 'ellipsis',
                       }}
                     >
+                      {s.title}
+                    </p>
+                    {showTime && (
                       <p
-                        className="font-bold leading-tight w-full text-center"
-                        style={{
-                          color: colors.text,
-                          fontSize: height >= 54 ? '13px' : '11px',
-                          whiteSpace: height >= 54 ? 'normal' : 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: height >= 54 ? 'clip' : 'ellipsis',
-                        }}
+                        className="mt-0.5 leading-tight text-center w-full"
+                        style={{ color: colors.border, fontSize: '10px' }}
                       >
-                        {s.title}
+                        {fmt12(s.startTime)}~<br />{fmt12(s.endTime)}
                       </p>
-                      {showTime && (
-                        <p
-                          className="mt-0.5 leading-tight text-center w-full"
-                          style={{ color: colors.border, fontSize: '10px' }}
-                        >
-                          {fmt12(s.startTime)}~<br />{fmt12(s.endTime)}
-                        </p>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
