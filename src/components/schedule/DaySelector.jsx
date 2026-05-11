@@ -22,11 +22,14 @@ function buildDays(today) {
 export default function DaySelector({ today, selectedDate, onSelect }) {
   const days = buildDays(today)
   const selectedRef = useRef(null)
+  const isMounted = useRef(false)
 
-  // 선택된 날짜가 바뀌면 해당 버튼이 가운데 오도록 스크롤
+  // 초기 로드: instant(애니메이션 없이 즉시 이동), 이후 날짜 변경: smooth
   useEffect(() => {
+    const behavior = isMounted.current ? 'smooth' : 'instant'
+    isMounted.current = true
     selectedRef.current?.scrollIntoView({
-      behavior: 'smooth',
+      behavior,
       inline: 'center',
       block: 'nearest',
     })
