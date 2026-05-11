@@ -7,7 +7,7 @@ import { useGCal } from '../../context/GoogleCalendarContext'
 const HOUR_HEIGHT  = 72
 const START_HOUR   = 9
 const END_HOUR     = 22
-const TIME_WIDTH   = 20          // 시간축 너비 축소 (기존 36 → 20)
+const TIME_WIDTH   = 16          // 시간축 너비 축소 (기존 36 → 16)
 
 const TOTAL_HOURS  = END_HOUR - START_HOUR
 const TOTAL_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT
@@ -99,7 +99,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
               className="absolute w-full flex justify-end"
               style={{ top: i * HOUR_HEIGHT - 7 }}
             >
-              <span className="text-[10px] text-slate-400 font-medium leading-none">
+              <span className="text-[11px] text-slate-400 font-medium leading-none">
                 {hourLabel(START_HOUR + i)}
               </span>
             </div>
