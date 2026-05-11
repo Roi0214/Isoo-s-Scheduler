@@ -181,10 +181,10 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                       className="font-bold leading-tight w-full text-center"
                       style={{
                         color: colors.text,
-                        fontSize: height >= 54 ? '13px' : '11px',
-                        whiteSpace: height >= 54 ? 'normal' : 'nowrap',
+                        fontSize: height >= 72 ? '16px' : height >= 48 ? '14px' : '12px',
+                        whiteSpace: height >= 48 ? 'normal' : 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: height >= 54 ? 'clip' : 'ellipsis',
+                        textOverflow: height >= 48 ? 'clip' : 'ellipsis',
                       }}
                     >
                       {s.title}
