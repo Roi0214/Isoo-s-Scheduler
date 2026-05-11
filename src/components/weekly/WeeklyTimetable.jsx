@@ -99,7 +99,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
               className="absolute w-full flex justify-end"
               style={{ top: i * HOUR_HEIGHT - 7 }}
             >
-              <span className="text-[13px] text-slate-400 font-medium leading-none">
+              <span className="text-[11px] text-slate-400 font-medium leading-none">
                 {hourLabel(START_HOUR + i)}
               </span>
             </div>
@@ -192,7 +192,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                     {showTime && (
                       <p
                         className="mt-0.5 leading-tight text-center w-full"
-                        style={{ color: colors.border, fontSize: '10px' }}
+                        style={{ color: colors.border, fontSize: '12px' }}
                       >
                         {fmt12(s.startTime)}~<br />{fmt12(s.endTime)}
                       </p>
