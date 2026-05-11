@@ -61,7 +61,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
           return (
             <div
               key={idx}
-              className={`flex-1 flex flex-col items-center py-1.5 rounded-xl mx-0.5
+              className={`flex-1 flex flex-col items-center py-1.5 rounded-xl
                 ${isToday   ? 'bg-indigo-600' :
                   isHoliday ? 'bg-red-100'    : ''}`}
             >
@@ -116,7 +116,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
           return (
             <div
               key={dayIdx}
-              className="flex-1 relative border-l border-slate-100 mx-0.5"
+              className="flex-1 relative border-l border-slate-100"
               style={{ height: TOTAL_HEIGHT }}
             >
               {/* 시간 구분선 */}
@@ -170,9 +170,9 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                     style={{
                       top: top + 1,
                       height: height - 2,
-                      left: 2,
-                      right: 2,
-                      width: 'calc(100% - 4px)',
+                      left: 1,
+                      right: 0,
+                      width: 'calc(100% - 1px)',
                       backgroundColor: colors.bg,
                       borderLeft: `3px solid ${colors.border}`,
                     }}
