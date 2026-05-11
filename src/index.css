@@ -4,6 +4,27 @@
   box-sizing: border-box;
 }
 
+/* 스크롤바 숨기기 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 날짜 전환 슬라이드 애니메이션 */
+@keyframes slideFromRight {
+  from { transform: translateX(32px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slideFromLeft {
+  from { transform: translateX(-32px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.slide-from-right { animation: slideFromRight 0.2s ease-out; }
+.slide-from-left  { animation: slideFromLeft  0.2s ease-out; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;

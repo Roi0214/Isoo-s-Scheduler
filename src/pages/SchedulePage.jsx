@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { CalendarDays, Plus, RefreshCw, WifiOff } from 'lucide-react'
 import DaySelector from '../components/schedule/DaySelector'
 import ScheduleItem from '../components/schedule/ScheduleItem'
@@ -38,9 +38,18 @@ function prevDayStr(date) {
   return d.toISOString().slice(0, 10)
 }
 
+function addDays(date, n) {
+  const d = new Date(date)
+  d.setDate(d.getDate() + n)
+  return d
+}
+
+const SWIPE_THRESHOLD = 50 // px
+
 export default function SchedulePage() {
   const today = new Date()
   const [selectedDate, setSelectedDate] = useState(today)
+  const [slideDir, setSlideDir] = useState(null) // 'left' | 'right' | null
   const now = useCurrentTime()
   const { schedules } = useSchedule()
   const { loading: gcalLoading, error: gcalError, getEventsForDate, getAllDayForDate, refetch } = useGCal()
@@ -49,6 +58,10 @@ export default function SchedulePage() {
   const [editItem, setEditItem] = useState(null)
   const [hwModalOpen, setHwModalOpen] = useState(false)
   const [hwPrefill, setHwPrefill] = useState(null)
+
+  // 스와이프 추적
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
 
   const openAddSchedule = () => { setEditItem(null); setScheduleModalOpen(true) }
   const openEditSchedule = (item) => { setEditItem(item); setScheduleModalOpen(true) }
@@ -63,6 +76,39 @@ export default function SchedulePage() {
     setHwModalOpen(true)
   }
   const closeHwModal = () => { setHwModalOpen(false); setHwPrefill(null) }
+
+  // DaySelector 탭 → 방향 계산 후 날짜 변경
+  const handleSelectDate = (date) => {
+    if (isSameDay(date, selectedDate)) return
+    setSlideDir(date.getTime() > selectedDate.getTime() ? 'left' : 'right')
+    setSelectedDate(date)
+  }
+
+  // 스와이프 핸들러
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    touchStartX.current = null
+
+    // 수직 스크롤이 더 크면 무시
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return
+
+    if (dx < 0) {
+      // 왼쪽으로 스와이프 → 다음 날
+      setSlideDir('left')
+      setSelectedDate(prev => addDays(prev, 1))
+    } else {
+      // 오른쪽으로 스와이프 → 이전 날
+      setSlideDir('right')
+      setSelectedDate(prev => addDays(prev, -1))
+    }
+  }
 
   const daySchedules = getSchedulesForDate(schedules, selectedDate)
   const externalEvents = getEventsForDate(selectedDate)
@@ -89,113 +135,128 @@ export default function SchedulePage() {
     ? daySchedules.find(s => getOngoingStatus(s.startTime, s.endTime, now).ongoing)
     : null
 
+  const slideClass = slideDir === 'left'
+    ? 'slide-from-right'
+    : slideDir === 'right'
+      ? 'slide-from-left'
+      : ''
+
   return (
     <div>
-      <DaySelector today={today} selectedDate={selectedDate} onSelect={setSelectedDate} />
+      {/* DaySelector는 슬라이드 밖에 고정 */}
+      <DaySelector today={today} selectedDate={selectedDate} onSelect={handleSelectDate} />
 
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800">
-            {isToday ? '오늘' : `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일`}
-            <span className="ml-2 text-base font-medium text-slate-400">
-              {WEEKDAYS[selectedDate.getDay()]}
-            </span>
-          </h2>
-          {ongoingItem ? (
-            <p className="text-sm text-indigo-500 font-medium">
-              📍 지금은 <span className="font-bold">{ongoingItem.title}</span> 시간이에요
-            </p>
+      {/* 날짜 전환 시 슬라이드 애니메이션 적용 영역 */}
+      <div
+        key={dateStr}
+        className={slideClass}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">
+              {isToday ? '오늘' : `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일`}
+              <span className="ml-2 text-base font-medium text-slate-400">
+                {WEEKDAYS[selectedDate.getDay()]}
+              </span>
+            </h2>
+            {ongoingItem ? (
+              <p className="text-sm text-indigo-500 font-medium">
+                📍 지금은 <span className="font-bold">{ongoingItem.title}</span> 시간이에요
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400">
+                일정 {daySchedules.length}개
+                {externalEvents.length > 0 && (
+                  <span className="text-blue-400"> · Google {externalEvents.length}개</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {isToday ? (
+            <div className="flex flex-col items-end">
+              <div className="flex items-baseline gap-1 leading-none">
+                <span className="text-[11px] font-semibold text-indigo-400">
+                  {now.getHours() < 12 ? '오전' : '오후'}
+                </span>
+                <span className="text-2xl font-extrabold text-indigo-600 tabular-nums">
+                  {now.getHours() % 12 || 12}:{String(now.getMinutes()).padStart(2, '0')}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">현재 시각</p>
+            </div>
           ) : (
-            <p className="text-sm text-slate-400">
-              일정 {daySchedules.length}개
-              {externalEvents.length > 0 && (
-                <span className="text-blue-400"> · Google {externalEvents.length}개</span>
-              )}
-            </p>
+            <CalendarDays size={20} className="text-slate-300" />
           )}
         </div>
 
-        {isToday ? (
-          <div className="flex flex-col items-end">
-            <div className="flex items-baseline gap-1 leading-none">
-              <span className="text-[11px] font-semibold text-indigo-400">
-                {now.getHours() < 12 ? '오전' : '오후'}
-              </span>
-              <span className="text-2xl font-extrabold text-indigo-600 tabular-nums">
-                {now.getHours() % 12 || 12}:{String(now.getMinutes()).padStart(2, '0')}
-              </span>
+        {/* 구글 캘린더 상태 표시 */}
+        {gcalLoading && (
+          <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-2">
+            <RefreshCw size={11} className="animate-spin" />
+            Google 캘린더 불러오는 중…
+          </div>
+        )}
+        {gcalError && (
+          <div className="flex flex-col gap-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 mb-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <WifiOff size={11} />
+              <span className="font-medium">Google 캘린더 연결 실패</span>
+              <button onClick={refetch} className="ml-auto text-indigo-400 font-semibold">재시도</button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">현재 시각</p>
+            <p className="text-[10px] text-slate-400 leading-snug">{gcalError}</p>
+          </div>
+        )}
+
+        {/* 종일 이벤트 (Google 캘린더) */}
+        {allDayEvents.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {allDayEvents.map(e => (
+              <span key={e.id} className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
+                📅 {e.title}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {allItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
+            <span className="text-4xl">🎉</span>
+            <p className="text-sm font-medium">일정이 없는 날이에요!</p>
+            <button onClick={openAddSchedule} className="mt-2 text-sm text-indigo-500 font-semibold">+ 일정 추가하기</button>
           </div>
         ) : (
-          <CalendarDays size={20} className="text-slate-300" />
-        )}
-      </div>
+          <div className="flex flex-col gap-2">
+            {allItems.map((item) => {
+              const { ongoing, progress } = isToday
+                ? getOngoingStatus(item.startTime, item.endTime, now)
+                : { ongoing: false, progress: 0 }
+              const isPast = isToday && !ongoing && item.endTime <= nowStr
 
-      {/* 구글 캘린더 상태 표시 */}
-      {gcalLoading && (
-        <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-2">
-          <RefreshCw size={11} className="animate-spin" />
-          Google 캘린더 불러오는 중…
-        </div>
-      )}
-      {gcalError && (
-        <div className="flex flex-col gap-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 mb-2">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <WifiOff size={11} />
-            <span className="font-medium">Google 캘린더 연결 실패</span>
-            <button onClick={refetch} className="ml-auto text-indigo-400 font-semibold">재시도</button>
+              if (item._type === 'external') {
+                return <ExternalEventItem key={item.id} item={item} isPast={isPast} />
+              }
+              return (
+                <ScheduleItem
+                  key={item.id}
+                  item={item}
+                  dateStr={dateStr}
+                  ongoing={ongoing}
+                  progress={progress}
+                  isPast={isPast}
+                  onEdit={() => openEditSchedule(item)}
+                  onAddHomework={() => openAddHomework(item)}
+                />
+              )
+            })}
           </div>
-          <p className="text-[10px] text-slate-400 leading-snug">{gcalError}</p>
-        </div>
-      )}
+        )}
 
-      {/* 종일 이벤트 (Google 캘린더) */}
-      {allDayEvents.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {allDayEvents.map(e => (
-            <span key={e.id} className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-medium">
-              📅 {e.title}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {allItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-400">
-          <span className="text-4xl">🎉</span>
-          <p className="text-sm font-medium">일정이 없는 날이에요!</p>
-          <button onClick={openAddSchedule} className="mt-2 text-sm text-indigo-500 font-semibold">+ 일정 추가하기</button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {allItems.map((item) => {
-            const { ongoing, progress } = isToday
-              ? getOngoingStatus(item.startTime, item.endTime, now)
-              : { ongoing: false, progress: 0 }
-            const isPast = isToday && !ongoing && item.endTime <= nowStr
-
-            if (item._type === 'external') {
-              return <ExternalEventItem key={item.id} item={item} isPast={isPast} />
-            }
-            return (
-              <ScheduleItem
-                key={item.id}
-                item={item}
-                dateStr={dateStr}
-                ongoing={ongoing}
-                progress={progress}
-                isPast={isPast}
-                onEdit={() => openEditSchedule(item)}
-                onAddHomework={() => openAddHomework(item)}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {/* 일별 메모 */}
-      <DailyMemo dateStr={dateStr} />
+        {/* 일별 메모 */}
+        <DailyMemo dateStr={dateStr} />
+      </div>
 
       {/* FAB */}
       <button
