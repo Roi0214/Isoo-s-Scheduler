@@ -2,13 +2,23 @@ import { useState, useEffect } from 'react'
 import { X, Plus, CalendarClock } from 'lucide-react'
 import WeeklyTimetable from '../weekly/WeeklyTimetable'
 import NextTermItemModal from './NextTermItemModal'
-import { getWeekDates, localDateStr } from '../../utils/weekUtils'
+import { getWeekDates, shiftWeek, localDateStr } from '../../utils/weekUtils'
 import { useSchedule } from '../../context/ScheduleContext'
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + n)
   return localDateStr(d)
+}
+
+// dateStr을 포함하는 주(월~금)를 반환하되, 그 주의 금요일이 dateStr보다 이르면
+// (dateStr이 주말인 경우) 다음 주로 넘겨 평일 전체가 dateStr 이후가 되도록 함
+function weekOnOrAfter(dateStr) {
+  let week = getWeekDates(new Date(dateStr + 'T00:00:00'))
+  if (localDateStr(week[4]) < dateStr) {
+    week = shiftWeek(week, 1)
+  }
+  return week
 }
 
 // 현재 시간표를 기반으로 자유롭게 편집한 뒤, 특정 날짜부터 일괄 적용하는 전체화면 오버레이
@@ -23,16 +33,30 @@ export default function NextTermSetup({ isOpen, onClose }) {
   const [editItem, setEditItem] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [loadedExisting, setLoadedExisting] = useState(false)
+  const [canvasWeek, setCanvasWeek] = useState(() => getWeekDates(today))
 
-  // 오버레이가 열릴 때마다 현재 활성 시간표를 초안으로 복제
+  // 오버레이가 열릴 때마다 초안 구성:
+  // - 이미 만들어둔(아직 발효 전) 다음학기 일정이 있으면 그 날짜 기준으로 불러와 이어서 편집
+  // - 없으면 현재 활성 시간표를 기반으로 새로 시작
   useEffect(() => {
     if (isOpen) {
+      const upcoming = schedules
+        .map(s => s.effectiveFrom)
+        .filter(d => d && d > todayStr)
+        .sort()
+      const nextTermDate = upcoming[0] ?? null
+      const refDate = nextTermDate ?? todayStr
+
       const active = schedules
-        .filter(s => !s.effectiveTo || s.effectiveTo >= todayStr)
+        .filter(s => (!s.effectiveFrom || s.effectiveFrom <= refDate) && (!s.effectiveTo || s.effectiveTo >= refDate))
         .map(s => ({ ...s, exceptions: [] }))
+
       setDraft(active)
-      setEffectiveDate('')
+      setEffectiveDate(nextTermDate ?? '')
+      setLoadedExisting(!!nextTermDate)
       setShowConfirm(false)
+      setCanvasWeek(nextTermDate ? weekOnOrAfter(nextTermDate) : getWeekDates(today))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
@@ -81,16 +105,23 @@ export default function NextTermSetup({ isOpen, onClose }) {
           onChange={e => setEffectiveDate(e.target.value)}
           className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
-        <p className="mt-1.5 text-xs text-slate-400 leading-snug">
-          현재 시간표를 기반으로 자유롭게 수정하세요. 저장하면 선택한 날짜부터 새 시간표가
-          적용되고, 이전 시간표는 그 전날까지 그대로 유지됩니다.
-        </p>
+        {loadedExisting ? (
+          <p className="mt-1.5 text-xs text-indigo-500 font-medium leading-snug">
+            📌 이미 만들어 둔 {effectiveDate} 시간표를 불러왔습니다. 계속 수정하고 저장하면
+            그대로 갱신됩니다.
+          </p>
+        ) : (
+          <p className="mt-1.5 text-xs text-slate-400 leading-snug">
+            현재 시간표를 기반으로 자유롭게 수정하세요. 저장하면 선택한 날짜부터 새 시간표가
+            적용되고, 이전 시간표는 그 전날까지 그대로 유지됩니다.
+          </p>
+        )}
       </div>
 
       {/* 캔버스 — 기존 WeeklyTimetable 재사용 */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <WeeklyTimetable
-          weekDates={getWeekDates(today)}
+          weekDates={canvasWeek}
           schedules={draft}
           today={today}
           onBlockClick={(item) => setEditItem(item)}

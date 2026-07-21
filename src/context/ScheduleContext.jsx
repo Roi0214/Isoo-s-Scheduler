@@ -100,8 +100,14 @@ export function ScheduleProvider({ children }) {
 
   // 다음학기 시간표 일괄 적용: draftItems를 effectiveDate부터 반영
   // - 기존 항목과 id 같고 내용 동일 → 유지
-  // - 기존 항목과 id 같고 내용 다름 → 기존은 종료, draft 내용으로 새 버전 분기
-  // - 기존에만 있음(draft에서 삭제됨) → 기존을 종료 (완전 삭제 아님)
+  // - 기존 항목과 id 같고 내용 다름:
+  //   - 이미 같은 effectiveDate로 분기된(아직 발효 전) 항목이면 → 재분기 없이 그대로 덮어쓰기
+  //     (발효 전 다음학기 안을 다시 열어 계속 고치는 경우 — 재분기하면 effectiveFrom>effectiveTo인
+  //      죽은 레코드가 생기므로 주의)
+  //   - 그 외(현재 활성 중인 항목) → 기존은 종료, draft 내용으로 새 버전 분기
+  // - 기존에만 있음(draft에서 삭제됨):
+  //   - 아직 발효 전 분기였다면 → 이력 남길 필요 없이 완전 삭제
+  //   - 그 외 → 기존을 종료 (완전 삭제 아님)
   // - draft에만 있음(신규 추가) → effectiveFrom부터 새로 추가
   const applyNextTermSchedule = useCallback((effectiveDate, draftItems) => {
     const prev_ = new Date(effectiveDate + 'T00:00:00')
@@ -123,12 +129,19 @@ export function ScheduleProvider({ children }) {
       const result = []
       for (const s of prev) {
         const draft = draftById.get(s.id)
+        const isPendingBranch = s.effectiveFrom === effectiveDate
+
         if (!draft) {
-          // draft에서 삭제됨 → 종료
+          if (isPendingBranch) {
+            continue // 발효 전 분기를 draft에서 삭제 → 이력 없이 완전 제거
+          }
           result.push({ ...s, effectiveTo })
         } else if (sameContent(s, draft)) {
           // 변경 없음 → 유지
           result.push(s)
+        } else if (isPendingBranch) {
+          // 발효 전 분기를 다시 수정 → 재분기 없이 덮어쓰기
+          result.push({ ...s, ...draft, effectiveFrom: effectiveDate, effectiveTo: null })
         } else {
           // 변경됨 → 기존 종료 + 새 버전 분기
           result.push({ ...s, effectiveTo })
