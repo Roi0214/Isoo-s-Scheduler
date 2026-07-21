@@ -1,4 +1,5 @@
-import { getSchedulesForDate, getColorForTitle } from '../../data/scheduleData'
+import { useMemo } from 'react'
+import { getSchedulesForDate, buildTitleColorMap } from '../../data/scheduleData'
 import { isSameDay } from '../../utils/weekUtils'
 import { useCurrentTime } from '../../hooks/useCurrentTime'
 import { useGCal } from '../../context/GoogleCalendarContext'
@@ -38,6 +39,7 @@ function fmt12(timeStr) {
 export default function WeeklyTimetable({ weekDates, schedules, today, onBlockClick }) {
   const now = useCurrentTime()
   const { getAllDayForDate } = useGCal()
+  const titleColors = useMemo(() => buildTitleColorMap(schedules), [schedules])
 
   const weekdays = weekDates.slice(0, 5)
 
@@ -154,7 +156,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
                 const height = timeToHeight(s.startTime, s.endTime)
                 if (top > TOTAL_HEIGHT || top + height < 0) return null
 
-                const preset = getColorForTitle(s.title)
+                const preset = titleColors.get(s.title)
                 const colors = preset
                   ? { bg: preset.blockBg, border: preset.blockBorder, text: preset.blockText }
                   : FALLBACK_COLOR

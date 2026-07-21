@@ -25,13 +25,16 @@ export function getColorPreset(key) {
   return COLOR_PRESETS.find(p => p.key === key) ?? COLOR_PRESETS[COLOR_PRESETS.length - 1]
 }
 
-// 일정 이름(학원명 등)마다 항상 같은 색이 나오도록 해시로 프리셋 배정
-export function getColorForTitle(title) {
-  let hash = 0
-  for (let i = 0; i < title.length; i++) {
-    hash = (hash * 31 + title.charCodeAt(i)) | 0
-  }
-  return COLOR_PRESETS[Math.abs(hash) % COLOR_PRESETS.length]
+// schedules에 등장하는 고유 일정 이름(학원명 등)마다 겹치지 않는 색을 배정
+// (이름을 정렬한 순서대로 팔레트를 순환 배정 — 이름 집합이 같으면 항상 같은 매핑,
+//  고유 이름 수가 팔레트 수(12) 이하면 완전히 겹치지 않음)
+export function buildTitleColorMap(schedules) {
+  const uniqueTitles = [...new Set(schedules.map(s => s.title))].sort()
+  const map = new Map()
+  uniqueTitles.forEach((title, i) => {
+    map.set(title, COLOR_PRESETS[i % COLOR_PRESETS.length])
+  })
+  return map
 }
 
 // 기본 분류 정의 (Context 초기값으로 사용)

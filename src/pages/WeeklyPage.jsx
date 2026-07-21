@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Plus, CalendarClock } from 'lucide-react'
 import WeekNavigator from '../components/weekly/WeekNavigator'
 import WeeklyTimetable from '../components/weekly/WeeklyTimetable'
 import ScheduleFormModal from '../components/schedule/ScheduleFormModal'
 import NextTermSetup from '../components/schedule/NextTermSetup'
 import { getWeekDates, shiftWeek, isSameDay } from '../utils/weekUtils'
-import { getSchedulesForDate, getColorForTitle } from '../data/scheduleData'
+import { getSchedulesForDate, buildTitleColorMap } from '../data/scheduleData'
 import { useSchedule } from '../context/ScheduleContext'
 import { useHomework } from '../context/HomeworkContext'
 
@@ -48,6 +48,9 @@ export default function WeeklyPage() {
         .map(s => s.title)
     )
   )]
+
+  // WeeklyTimetable과 동일한 schedules 배열 기준으로 만들어야 블록 색상과 일치함
+  const titleColors = useMemo(() => buildTitleColorMap(schedules), [schedules])
 
   return (
     <div>
@@ -121,7 +124,7 @@ export default function WeeklyPage() {
       {/* 범례 — 이번 주 일정 이름별 색상 */}
       <div className="mt-4 flex flex-wrap gap-x-2 gap-y-1.5 px-1">
         {legendTitles.map(title => {
-          const preset = getColorForTitle(title)
+          const preset = titleColors.get(title)
           return (
             <span
               key={title}
