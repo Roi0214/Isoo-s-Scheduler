@@ -5,15 +5,14 @@ import WeeklyTimetable from '../components/weekly/WeeklyTimetable'
 import ScheduleFormModal from '../components/schedule/ScheduleFormModal'
 import NextTermSetup from '../components/schedule/NextTermSetup'
 import { getWeekDates, shiftWeek, isSameDay } from '../utils/weekUtils'
-import { getSchedulesForDate } from '../data/scheduleData'
+import { getSchedulesForDate, getColorForTitle } from '../data/scheduleData'
 import { useSchedule } from '../context/ScheduleContext'
-import { getColorPreset } from '../data/scheduleData'
 import { useHomework } from '../context/HomeworkContext'
 
 export default function WeeklyPage() {
   const today = new Date()
   const [weekDates, setWeekDates] = useState(() => getWeekDates(today))
-  const { schedules, categoryMap } = useSchedule()
+  const { schedules } = useSchedule()
   const { homeworks } = useHomework()
 
   const [editState, setEditState] = useState(null)  // { item, date }
@@ -40,6 +39,15 @@ export default function WeeklyPage() {
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   ))
   const weekHomeworkCount = homeworks.filter(hw => weekDateStrs.has(hw.dueDate)).length
+
+  // 이번 주에 표시되는 고유 일정 이름 (미션 제외) — 범례용
+  const legendTitles = [...new Set(
+    weekdays.flatMap(date =>
+      getSchedulesForDate(schedules, date)
+        .filter(s => s.category !== 'mission')
+        .map(s => s.title)
+    )
+  )]
 
   return (
     <div>
@@ -110,22 +118,20 @@ export default function WeeklyPage() {
         applyDate={editApplyDate}
       />
 
-      {/* 범례 — 분류 추가/수정 시 자동 반영 */}
+      {/* 범례 — 이번 주 일정 이름별 색상 */}
       <div className="mt-4 flex flex-wrap gap-x-2 gap-y-1.5 px-1">
-        {Object.entries(categoryMap)
-          .filter(([id]) => id !== 'mission') // 미션은 주간표에 미표시
-          .map(([id, cat]) => {
-            const preset = getColorPreset(cat.colorKey)
-            return (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium"
-                style={{ backgroundColor: preset.blockBg, color: preset.blockText, borderLeft: `3px solid ${preset.blockBorder}` }}
-              >
-                {cat.label}
-              </span>
-            )
-          })}
+        {legendTitles.map(title => {
+          const preset = getColorForTitle(title)
+          return (
+            <span
+              key={title}
+              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium"
+              style={{ backgroundColor: preset.blockBg, color: preset.blockText, borderLeft: `3px solid ${preset.blockBorder}` }}
+            >
+              {title}
+            </span>
+          )
+        })}
       </div>
     </div>
   )

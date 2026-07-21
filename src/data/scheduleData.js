@@ -25,6 +25,15 @@ export function getColorPreset(key) {
   return COLOR_PRESETS.find(p => p.key === key) ?? COLOR_PRESETS[COLOR_PRESETS.length - 1]
 }
 
+// 일정 이름(학원명 등)마다 항상 같은 색이 나오도록 해시로 프리셋 배정
+export function getColorForTitle(title) {
+  let hash = 0
+  for (let i = 0; i < title.length; i++) {
+    hash = (hash * 31 + title.charCodeAt(i)) | 0
+  }
+  return COLOR_PRESETS[Math.abs(hash) % COLOR_PRESETS.length]
+}
+
 // 기본 분류 정의 (Context 초기값으로 사용)
 export const DEFAULT_CATEGORIES = {
   school:   { label: '학교',   colorKey: 'blue' },
