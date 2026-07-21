@@ -1,0 +1,146 @@
+import { useState, useEffect } from 'react'
+import { X, Plus, CalendarClock } from 'lucide-react'
+import WeeklyTimetable from '../weekly/WeeklyTimetable'
+import NextTermItemModal from './NextTermItemModal'
+import { getWeekDates, localDateStr } from '../../utils/weekUtils'
+import { useSchedule } from '../../context/ScheduleContext'
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return localDateStr(d)
+}
+
+// 현재 시간표를 기반으로 자유롭게 편집한 뒤, 특정 날짜부터 일괄 적용하는 전체화면 오버레이
+export default function NextTermSetup({ isOpen, onClose }) {
+  const { schedules, applyNextTermSchedule } = useSchedule()
+  const today = new Date()
+  const todayStr = localDateStr(today)
+  const minDate = addDays(todayStr, 1)
+
+  const [draft, setDraft] = useState([])
+  const [effectiveDate, setEffectiveDate] = useState('')
+  const [editItem, setEditItem] = useState(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  // 오버레이가 열릴 때마다 현재 활성 시간표를 초안으로 복제
+  useEffect(() => {
+    if (isOpen) {
+      const active = schedules
+        .filter(s => !s.effectiveTo || s.effectiveTo >= todayStr)
+        .map(s => ({ ...s, exceptions: [] }))
+      setDraft(active)
+      setEffectiveDate('')
+      setShowConfirm(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  const handleSaveItem = (formData) => {
+    if (editItem) {
+      setDraft(prev => prev.map(d => d.id === editItem.id ? { ...d, ...formData } : d))
+    } else {
+      setDraft(prev => [...prev, { ...formData, id: `draft-${Date.now()}`, exceptions: [], googleCalendarId: null }])
+    }
+  }
+
+  const handleDeleteItem = () => {
+    setDraft(prev => prev.filter(d => d.id !== editItem.id))
+  }
+
+  const handleApply = () => {
+    applyNextTermSchedule(effectiveDate, draft)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 bg-white flex flex-col">
+      {/* 헤더 */}
+      <div className="flex-shrink-0 border-b border-slate-100 px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-1.5">
+            <CalendarClock size={18} className="text-indigo-500" />
+            다음학기 시간표 만들기
+          </h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <label className="block text-sm font-semibold text-slate-600 mb-1">이 날짜부터 적용</label>
+        <input
+          type="date"
+          value={effectiveDate}
+          min={minDate}
+          onChange={e => setEffectiveDate(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        <p className="mt-1.5 text-xs text-slate-400 leading-snug">
+          현재 시간표를 기반으로 자유롭게 수정하세요. 저장하면 선택한 날짜부터 새 시간표가
+          적용되고, 이전 시간표는 그 전날까지 그대로 유지됩니다.
+        </p>
+      </div>
+
+      {/* 캔버스 — 기존 WeeklyTimetable 재사용 */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <WeeklyTimetable
+          weekDates={getWeekDates(today)}
+          schedules={draft}
+          today={today}
+          onBlockClick={(item) => setEditItem(item)}
+        />
+      </div>
+
+      {/* FAB */}
+      <button
+        onClick={() => setAddOpen(true)}
+        className="fixed bottom-24 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center active:scale-95 transition-transform z-40"
+        aria-label="일정 추가"
+      >
+        <Plus size={26} strokeWidth={2.5} />
+      </button>
+
+      {/* 하단 저장 바 */}
+      <div className="flex-shrink-0 border-t border-slate-100 px-4 py-3">
+        {showConfirm ? (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-center">
+            <p className="text-sm text-indigo-700 font-medium mb-3">
+              {effectiveDate}부터 적용됩니다. 진행할까요?
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 text-sm font-medium">취소</button>
+              <button onClick={handleApply} className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold">적용</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowConfirm(true)}
+            disabled={!effectiveDate}
+            className="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold text-base active:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400"
+          >
+            다음학기 시간표로 저장
+          </button>
+        )}
+      </div>
+
+      <NextTermItemModal
+        isOpen={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSave={handleSaveItem}
+      />
+      <NextTermItemModal
+        isOpen={!!editItem}
+        onClose={() => setEditItem(null)}
+        editItem={editItem}
+        onSave={handleSaveItem}
+        onDelete={handleDeleteItem}
+      />
+    </div>
+  )
+}

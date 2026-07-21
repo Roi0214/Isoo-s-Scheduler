@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { LayoutGrid, Plus } from 'lucide-react'
+import { Plus, CalendarClock } from 'lucide-react'
 import WeekNavigator from '../components/weekly/WeekNavigator'
 import WeeklyTimetable from '../components/weekly/WeeklyTimetable'
 import ScheduleFormModal from '../components/schedule/ScheduleFormModal'
+import NextTermSetup from '../components/schedule/NextTermSetup'
 import { getWeekDates, shiftWeek, isSameDay } from '../utils/weekUtils'
 import { getSchedulesForDate } from '../data/scheduleData'
 import { useSchedule } from '../context/ScheduleContext'
@@ -20,6 +21,7 @@ export default function WeeklyPage() {
   const editApplyDate = editState?.date ?? null
 
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [nextTermOpen, setNextTermOpen] = useState(false)
 
   const isCurrentWeek = weekDates.some(d => isSameDay(d, today))
 
@@ -52,7 +54,12 @@ export default function WeeklyPage() {
             )}
           </p>
         </div>
-        <LayoutGrid size={20} className="text-slate-300" />
+        <button
+          onClick={() => setNextTermOpen(true)}
+          className="flex items-center gap-1 text-xs text-indigo-500 font-semibold bg-indigo-50 px-2.5 py-1.5 rounded-full"
+        >
+          <CalendarClock size={13} /> 다음학기 시간표
+        </button>
       </div>
 
       {/* 주차 네비게이터 */}
@@ -87,6 +94,12 @@ export default function WeeklyPage() {
       <ScheduleFormModal
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
+      />
+
+      {/* 다음학기 시간표 만들기 */}
+      <NextTermSetup
+        isOpen={nextTermOpen}
+        onClose={() => setNextTermOpen(false)}
       />
 
       {/* 수정 모달 */}

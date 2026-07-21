@@ -98,6 +98,67 @@ export function ScheduleProvider({ children }) {
     setSchedules(prev => prev.filter(s => s.id !== id))
   }, [])
 
+  // 다음학기 시간표 일괄 적용: draftItems를 effectiveDate부터 반영
+  // - 기존 항목과 id 같고 내용 동일 → 유지
+  // - 기존 항목과 id 같고 내용 다름 → 기존은 종료, draft 내용으로 새 버전 분기
+  // - 기존에만 있음(draft에서 삭제됨) → 기존을 종료 (완전 삭제 아님)
+  // - draft에만 있음(신규 추가) → effectiveFrom부터 새로 추가
+  const applyNextTermSchedule = useCallback((effectiveDate, draftItems) => {
+    const prev_ = new Date(effectiveDate + 'T00:00:00')
+    prev_.setDate(prev_.getDate() - 1)
+    const effectiveTo = `${prev_.getFullYear()}-${String(prev_.getMonth() + 1).padStart(2, '0')}-${String(prev_.getDate()).padStart(2, '0')}`
+
+    const SAME_FIELDS = ['title', 'startTime', 'endTime', 'category']
+    const sameContent = (a, b) =>
+      SAME_FIELDS.every(f => a[f] === b[f]) &&
+      a.days.length === b.days.length &&
+      a.days.every(d => b.days.includes(d))
+
+    setSchedules(prev => {
+      const draftById = new Map(draftItems.map(d => [d.id, d]))
+      const currentIds = new Set(prev.map(s => s.id))
+      let seq = 0
+      const nextId = () => `schedule-${Date.now()}-${seq++}`
+
+      const result = []
+      for (const s of prev) {
+        const draft = draftById.get(s.id)
+        if (!draft) {
+          // draft에서 삭제됨 → 종료
+          result.push({ ...s, effectiveTo })
+        } else if (sameContent(s, draft)) {
+          // 변경 없음 → 유지
+          result.push(s)
+        } else {
+          // 변경됨 → 기존 종료 + 새 버전 분기
+          result.push({ ...s, effectiveTo })
+          result.push({
+            ...draft,
+            id: nextId(),
+            effectiveFrom: effectiveDate,
+            effectiveTo: null,
+            exceptions: [],
+          })
+        }
+      }
+
+      // draft에만 있는 신규 항목
+      for (const d of draftItems) {
+        if (!currentIds.has(d.id)) {
+          result.push({
+            ...d,
+            id: nextId(),
+            effectiveFrom: effectiveDate,
+            effectiveTo: null,
+            exceptions: [],
+          })
+        }
+      }
+
+      return result
+    })
+  }, [])
+
   // 특정 날짜부터 일정 종료 (effectiveTo 설정)
   // fromDate 이전에 이미 시작한 일정이면 effectiveTo 설정, 같은 날 시작이면 완전 삭제
   const deleteScheduleFrom = useCallback((id, fromDate) => {
@@ -159,6 +220,7 @@ export function ScheduleProvider({ children }) {
       addCategory, updateCategory, deleteCategory,
       schedules,
       addSchedule, updateSchedule, scheduleChangeFrom, deleteSchedule, deleteScheduleFrom,
+      applyNextTermSchedule,
       isCompleted, toggleCompleted,
     }}>
       {children}
