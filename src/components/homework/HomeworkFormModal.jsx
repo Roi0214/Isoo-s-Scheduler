@@ -26,11 +26,14 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
   const { schedules } = useSchedule()
   const isEdit = !!editItem
 
-  // 학원 선택지: mission·school 카테고리 제외, 중복 제거, 가나다 정렬
+  // 학원 선택지: mission·school 카테고리 제외, 현재 다니고 있는(오늘 기준 유효한) 학원만,
+  // 중복 제거, 가나다 정렬 — 예전에 그만둔 학원은 목록에서 자동으로 빠짐
   const academyOptions = useMemo(() => {
+    const today = todayStr()
     const seen = new Set()
     return schedules
       .filter(s => s.category !== 'mission' && s.category !== 'school')
+      .filter(s => (!s.effectiveFrom || s.effectiveFrom <= today) && (!s.effectiveTo || s.effectiveTo >= today))
       .map(s => s.title)
       .filter(t => { if (seen.has(t)) return false; seen.add(t); return true })
       .sort((a, b) => a.localeCompare(b, 'ko'))

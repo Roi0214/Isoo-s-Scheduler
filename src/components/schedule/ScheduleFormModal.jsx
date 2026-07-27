@@ -159,35 +159,37 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
           </div>
         </div>
 
-        {/* 카테고리 */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-semibold text-slate-600">분류</label>
-            <button
-              type="button"
-              onClick={() => setCatManagerOpen(true)}
-              className="flex items-center gap-1 text-xs text-indigo-500 font-medium hover:text-indigo-700"
-            >
-              <Settings2 size={12} /> 분류 관리
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {Object.entries(categories).map(([key, cat]) => (
+        {/* 카테고리 (수정 모드만 — 새로 추가할 땐 굳이 지정하지 않고 기본값 사용) */}
+        {isEdit && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold text-slate-600">분류</label>
               <button
-                key={key}
                 type="button"
-                onClick={() => setForm(p => ({ ...p, category: key }))}
-                className={`py-2 rounded-xl text-sm font-medium border transition-all
-                  ${form.category === key
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                  }`}
+                onClick={() => setCatManagerOpen(true)}
+                className="flex items-center gap-1 text-xs text-indigo-500 font-medium hover:text-indigo-700"
               >
-                {cat.label}
+                <Settings2 size={12} /> 분류 관리
               </button>
-            ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(categories).map(([key, cat]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setForm(p => ({ ...p, category: key }))}
+                  className={`py-2 rounded-xl text-sm font-medium border transition-all
+                    ${form.category === key
+                      ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 적용 범위 (추가 모드 + weekDates 있을 때만) */}
         {!isEdit && weekDates && (

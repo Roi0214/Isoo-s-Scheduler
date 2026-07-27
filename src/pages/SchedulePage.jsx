@@ -8,6 +8,7 @@ import HomeworkFormModal from '../components/homework/HomeworkFormModal'
 import DailyMemo from '../components/schedule/DailyMemo'
 import { getSchedulesForDate, CATEGORIES } from '../data/scheduleData'
 import { CATEGORY_TO_SUBJECT } from '../data/homeworkData'
+import { getWeekDates } from '../utils/weekUtils'
 import { useSchedule } from '../context/ScheduleContext'
 import { useGCal } from '../context/GoogleCalendarContext'
 import { useCurrentTime, getOngoingStatus } from '../hooks/useCurrentTime'
@@ -262,6 +263,7 @@ export default function SchedulePage() {
         onClose={closeScheduleModal}
         editItem={editItem}
         applyDate={dateStr}
+        weekDates={getWeekDates(selectedDate)}
       />
 
       <HomeworkFormModal
