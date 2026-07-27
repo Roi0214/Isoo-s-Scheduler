@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import Modal from '../common/Modal'
-import { useSchedule } from '../../context/ScheduleContext'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -15,7 +14,6 @@ const EMPTY_FORM = {
 
 // 다음학기 시간표 초안(draft) 편집 전용 — Supabase/날짜분기 없이 draft 배열만 조작
 export default function NextTermItemModal({ isOpen, onClose, editItem = null, onSave, onDelete }) {
-  const { categories } = useSchedule()
   const isEdit = !!editItem
 
   const [form, setForm] = useState({ ...EMPTY_FORM })
@@ -114,27 +112,6 @@ export default function NextTermItemModal({ isOpen, onClose, editItem = null, on
                   }`}
               >
                 {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 카테고리 */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-600 mb-2">분류</label>
-          <div className="grid grid-cols-3 gap-2">
-            {Object.entries(categories).map(([key, cat]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setForm(p => ({ ...p, category: key }))}
-                className={`py-2 rounded-xl text-sm font-medium border transition-all
-                  ${form.category === key
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                  }`}
-              >
-                {cat.label}
               </button>
             ))}
           </div>
