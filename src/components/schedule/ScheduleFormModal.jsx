@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Trash2, Settings2, CalendarOff } from 'lucide-react'
+import { Trash2, CalendarOff } from 'lucide-react'
 import Modal from '../common/Modal'
 import { useSchedule } from '../../context/ScheduleContext'
-import CategoryManagerModal from './CategoryManagerModal'
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -15,8 +14,7 @@ const EMPTY_FORM = {
 }
 
 export default function ScheduleFormModal({ isOpen, onClose, editItem = null, applyDate = null, weekDates = null }) {
-  const { addSchedule, updateSchedule, scheduleChangeFrom, deleteSchedule, deleteScheduleFrom, skipThisWeek, addThisWeekOnly, categories } = useSchedule()
-  const [catManagerOpen, setCatManagerOpen] = useState(false)
+  const { addSchedule, updateSchedule, scheduleChangeFrom, deleteSchedule, deleteScheduleFrom, skipThisWeek, addThisWeekOnly } = useSchedule()
   const isEdit = !!editItem
 
   const [form, setForm] = useState({ ...EMPTY_FORM })
@@ -100,7 +98,6 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
   const todayStr = `${today_.getFullYear()}-${String(today_.getMonth() + 1).padStart(2, '0')}-${String(today_.getDate()).padStart(2, '0')}`
 
   return (
-    <>
     <Modal isOpen={isOpen} onClose={resetAndClose} title={isEdit ? '일정 수정' : '일정 추가'}>
       <div className="flex flex-col gap-4">
 
@@ -158,38 +155,6 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
             ))}
           </div>
         </div>
-
-        {/* 카테고리 (수정 모드만 — 새로 추가할 땐 굳이 지정하지 않고 기본값 사용) */}
-        {isEdit && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-slate-600">분류</label>
-              <button
-                type="button"
-                onClick={() => setCatManagerOpen(true)}
-                className="flex items-center gap-1 text-xs text-indigo-500 font-medium hover:text-indigo-700"
-              >
-                <Settings2 size={12} /> 분류 관리
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {Object.entries(categories).map(([key, cat]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setForm(p => ({ ...p, category: key }))}
-                  className={`py-2 rounded-xl text-sm font-medium border transition-all
-                    ${form.category === key
-                      ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                    }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* 적용 범위 (추가 모드 + weekDates 있을 때만) */}
         {!isEdit && weekDates && (
@@ -323,11 +288,5 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
         )}
       </div>
     </Modal>
-
-    <CategoryManagerModal
-      isOpen={catManagerOpen}
-      onClose={() => setCatManagerOpen(false)}
-    />
-    </>
   )
 }

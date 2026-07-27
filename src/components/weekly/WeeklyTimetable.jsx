@@ -12,7 +12,7 @@ const TIME_WIDTH   = 10          // 시간축 너비 (숫자는 overflow:visible
 const TOTAL_HOURS  = END_HOUR - START_HOUR
 const TOTAL_HEIGHT = TOTAL_HOURS * HOUR_HEIGHT
 
-const WEEKDAY_LABELS = ['월', '화', '수', '목', '금']
+const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토']
 
 const FALLBACK_COLOR = { blockBg: '#f1f5f9', blockBorder: '#94a3b8', blockText: '#475569' }
 
@@ -41,7 +41,7 @@ export default function WeeklyTimetable({ weekDates, schedules, today, onBlockCl
   const { getAllDayForDate } = useGCal()
   const titleColors = useMemo(() => buildTitleColorMap(schedules), [schedules])
 
-  const weekdays = weekDates.slice(0, 5)
+  const weekdays = weekDates.slice(0, 6)
 
   const isCurrentWeek = weekdays.some(d => isSameDay(d, today))
   const nowTop = ((now.getHours() - START_HOUR) + now.getMinutes() / 60) * HOUR_HEIGHT

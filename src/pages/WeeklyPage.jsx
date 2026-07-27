@@ -27,10 +27,10 @@ export default function WeeklyPage() {
   const handlePrev = () => setWeekDates(prev => shiftWeek(prev, -1))
   const handleNext = () => setWeekDates(prev => shiftWeek(prev, +1))
 
-  // 월~금만 사용
-  const weekdays = weekDates.slice(0, 5)
+  // 월~토 사용
+  const weekdays = weekDates.slice(0, 6)
 
-  // 이번 주 총 일정 수 (월~금, 미션 제외)
+  // 이번 주 총 일정 수 (월~토, 미션 제외)
   const totalScheduleCount = weekdays.reduce((acc, date) =>
     acc + getSchedulesForDate(schedules, date).filter(s => s.category !== 'mission').length, 0)
 
