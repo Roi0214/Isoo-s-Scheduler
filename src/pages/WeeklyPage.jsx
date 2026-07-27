@@ -105,6 +105,7 @@ export default function WeeklyPage() {
       <ScheduleFormModal
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
+        weekDates={weekDates}
       />
 
       {/* 다음학기 시간표 만들기 */}
@@ -119,6 +120,7 @@ export default function WeeklyPage() {
         onClose={() => setEditState(null)}
         editItem={editItem}
         applyDate={editApplyDate}
+        weekDates={weekDates}
       />
 
       {/* 범례 — 이번 주 일정 이름별 색상 */}

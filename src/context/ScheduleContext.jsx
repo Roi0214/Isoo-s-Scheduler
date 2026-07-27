@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import { SCHEDULES, DEFAULT_CATEGORIES, buildCategories } from '../data/scheduleData'
 import { dbLoad, dbSave, localSave } from '../lib/db'
+import { localDateStr } from '../utils/weekUtils'
 
 const ScheduleContext = createContext(null)
 
@@ -96,6 +97,37 @@ export function ScheduleProvider({ children }) {
 
   const deleteSchedule = useCallback((id) => {
     setSchedules(prev => prev.filter(s => s.id !== id))
+  }, [])
+
+  // 이번 주만 쉬기: weekDates 중 해당 요일에 맞는 날짜를 전부 exceptions에 추가
+  // (반복 패턴 자체는 건드리지 않으므로 다음 주부터는 원래대로 돌아옴)
+  const skipThisWeek = useCallback((id, weekDates) => {
+    setSchedules(prev => {
+      const target = prev.find(s => s.id === id)
+      if (!target) return prev
+      const newDates = weekDates
+        .filter(d => target.days.includes(d.getDay()))
+        .map(localDateStr)
+        .filter(dateStr => !target.exceptions.includes(dateStr))
+      if (newDates.length === 0) return prev
+      return prev.map(s => s.id === id
+        ? { ...s, exceptions: [...s.exceptions, ...newDates] }
+        : s)
+    })
+  }, [])
+
+  // 이번 주만 추가: effectiveFrom/To를 해당 주(월~일)로 한정해서 새 항목 추가
+  const addThisWeekOnly = useCallback((item, weekDates) => {
+    const effectiveFrom = localDateStr(weekDates[0])
+    const effectiveTo = localDateStr(weekDates[weekDates.length - 1])
+    setSchedules(prev => [...prev, {
+      ...item,
+      id: `schedule-${Date.now()}`,
+      exceptions: [],
+      googleCalendarId: null,
+      effectiveFrom,
+      effectiveTo,
+    }])
   }, [])
 
   // 다음학기 시간표 일괄 적용: draftItems를 effectiveDate부터 반영
@@ -233,7 +265,7 @@ export function ScheduleProvider({ children }) {
       addCategory, updateCategory, deleteCategory,
       schedules,
       addSchedule, updateSchedule, scheduleChangeFrom, deleteSchedule, deleteScheduleFrom,
-      applyNextTermSchedule,
+      applyNextTermSchedule, skipThisWeek, addThisWeekOnly,
       isCompleted, toggleCompleted,
     }}>
       {children}

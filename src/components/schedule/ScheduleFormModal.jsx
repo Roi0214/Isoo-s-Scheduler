@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Trash2, Settings2 } from 'lucide-react'
+import { Trash2, Settings2, CalendarOff } from 'lucide-react'
 import Modal from '../common/Modal'
 import { useSchedule } from '../../context/ScheduleContext'
 import CategoryManagerModal from './CategoryManagerModal'
@@ -14,22 +14,26 @@ const EMPTY_FORM = {
   category: 'personal',
 }
 
-export default function ScheduleFormModal({ isOpen, onClose, editItem = null, applyDate = null }) {
-  const { addSchedule, updateSchedule, scheduleChangeFrom, deleteSchedule, deleteScheduleFrom, categories } = useSchedule()
+export default function ScheduleFormModal({ isOpen, onClose, editItem = null, applyDate = null, weekDates = null }) {
+  const { addSchedule, updateSchedule, scheduleChangeFrom, deleteSchedule, deleteScheduleFrom, skipThisWeek, addThisWeekOnly, categories } = useSchedule()
   const [catManagerOpen, setCatManagerOpen] = useState(false)
   const isEdit = !!editItem
 
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false)
   const [fromMode, setFromMode] = useState('immediate')  // 'immediate' | 'date'
   const [fromDate, setFromDate] = useState('')
+  const [addScope, setAddScope] = useState('repeat')  // 'repeat' | 'thisWeek' (추가 모드에서만 사용)
 
   // 모달이 열릴 때마다 editItem으로 폼 채우기
   useEffect(() => {
     if (isOpen) {
       setShowDeleteConfirm(false)
+      setShowSkipConfirm(false)
       setFromMode('immediate')
       setFromDate('')
+      setAddScope('repeat')
       setForm(editItem
         ? { title: editItem.title, startTime: editItem.startTime, endTime: editItem.endTime, days: [...editItem.days], category: editItem.category }
         : { ...EMPTY_FORM }
@@ -40,8 +44,10 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
   const resetAndClose = () => {
     setForm({ ...EMPTY_FORM })
     setShowDeleteConfirm(false)
+    setShowSkipConfirm(false)
     setFromMode('immediate')
     setFromDate('')
+    setAddScope('repeat')
     onClose()
   }
 
@@ -67,6 +73,8 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
         // 즉시 적용: 현재 보고 있는 날짜부터 분기
         scheduleChangeFrom(editItem.id, applyDate ?? todayStr, form)
       }
+    } else if (addScope === 'thisWeek' && weekDates) {
+      addThisWeekOnly(form, weekDates)
     } else {
       addSchedule(form)
     }
@@ -80,6 +88,11 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
     } else {
       deleteScheduleFrom(editItem.id, applyDate ?? todayStr)
     }
+    resetAndClose()
+  }
+
+  const handleSkipThisWeek = () => {
+    skipThisWeek(editItem.id, weekDates)
     resetAndClose()
   }
 
@@ -176,6 +189,40 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
           </div>
         </div>
 
+        {/* 적용 범위 (추가 모드 + weekDates 있을 때만) */}
+        {!isEdit && weekDates && (
+          <div>
+            <label className="block text-sm font-semibold text-slate-600 mb-2">적용 범위</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAddScope('repeat')}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all
+                  ${addScope === 'repeat'
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 text-slate-500'}`}
+              >
+                계속 반복
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddScope('thisWeek')}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all
+                  ${addScope === 'thisWeek'
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                    : 'border-slate-200 text-slate-500'}`}
+              >
+                이번 주만
+              </button>
+            </div>
+            {addScope === 'thisWeek' && (
+              <p className="mt-1.5 text-xs text-indigo-500 font-medium">
+                ※ 이번 주에만 표시되고, 다음 주부터는 자동으로 사라집니다
+              </p>
+            )}
+          </div>
+        )}
+
         {/* 변경 적용 방식 (수정 모드만) */}
         {isEdit && (
           <div>
@@ -229,8 +276,28 @@ export default function ScheduleFormModal({ isOpen, onClose, editItem = null, ap
           {isEdit ? '수정 완료' : '일정 추가'}
         </button>
 
+        {/* 이번 주만 쉬기 (수정 모드 + weekDates 있을 때만) */}
+        {isEdit && weekDates && !showSkipConfirm && !showDeleteConfirm && (
+          <button
+            onClick={() => setShowSkipConfirm(true)}
+            className="w-full flex items-center justify-center gap-2 text-amber-500 py-2 text-sm font-medium"
+          >
+            <CalendarOff size={14} /> 이번 주만 쉬기
+          </button>
+        )}
+        {isEdit && showSkipConfirm && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+            <p className="text-sm text-amber-700 font-medium mb-1">이번 주만 쉬어갈까요?</p>
+            <p className="text-xs text-amber-500 mb-3">다음 주부터는 원래대로 다시 표시됩니다</p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowSkipConfirm(false)} className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium">취소</button>
+              <button onClick={handleSkipThisWeek} className="flex-1 py-2 rounded-xl bg-amber-500 text-white text-sm font-bold">쉬기</button>
+            </div>
+          </div>
+        )}
+
         {/* 삭제 버튼 (수정 모드) */}
-        {isEdit && !showDeleteConfirm && (
+        {isEdit && !showDeleteConfirm && !showSkipConfirm && (
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="w-full flex items-center justify-center gap-2 text-red-400 py-2 text-sm font-medium"
