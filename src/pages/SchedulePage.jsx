@@ -7,22 +7,12 @@ import ScheduleFormModal from '../components/schedule/ScheduleFormModal'
 import HomeworkFormModal from '../components/homework/HomeworkFormModal'
 import DailyMemo from '../components/schedule/DailyMemo'
 import { getSchedulesForDate, CATEGORIES } from '../data/scheduleData'
+import { CATEGORY_TO_SUBJECT } from '../data/homeworkData'
 import { useSchedule } from '../context/ScheduleContext'
 import { useGCal } from '../context/GoogleCalendarContext'
 import { useCurrentTime, getOngoingStatus } from '../hooks/useCurrentTime'
 
 const WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
-
-const CATEGORY_TO_SUBJECT = {
-  school:   'korean',
-  math:     'math',
-  english:  'english',
-  science:  'science',
-  arts:     'etc',
-  reading:  'reading',
-  mission:  'mission',
-  personal: 'etc',
-}
 
 function isSameDay(a, b) {
   return (

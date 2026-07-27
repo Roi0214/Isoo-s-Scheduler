@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Trash2, CalendarClock, Wand2 } from 'lucide-react'
+import { Trash2, CalendarClock } from 'lucide-react'
 import Modal from '../common/Modal'
-import { HW_SUBJECTS } from '../../data/homeworkData'
+import { CATEGORY_TO_SUBJECT } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
 import { useSchedule } from '../../context/ScheduleContext'
 import { findNextClassDate, prevDayStr } from '../../utils/scheduleUtils'
@@ -13,12 +13,10 @@ function todayStr() {
 
 const EMPTY_FORM = {
   title: '',
-  subject: 'math',
   dueDate: todayStr(),
   memo: '',
   repeat: false,
   status: 'backlog',
-  estimated_minutes: 30,
   linked_event: '',
   fixed_d1: false,
 }
@@ -38,20 +36,16 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       .sort((a, b) => a.localeCompare(b, 'ko'))
   }, [schedules])
 
-  // 자동 날짜: 편집 모드에선 기존 날짜 유지, 신규엔 자동 설정
-  const [autoDateActive, setAutoDateActive] = useState(false)
   const [linkedEventWarning, setLinkedEventWarning] = useState(false)
 
   const buildInitial = () => {
     if (editItem) {
       return {
         title: editItem.title,
-        subject: editItem.subject,
         dueDate: editItem.dueDate,
         memo: editItem.memo ?? '',
         repeat: editItem.repeat,
         status: editItem.status ?? 'backlog',
-        estimated_minutes: editItem.estimated_minutes ?? 30,
         linked_event: editItem.linked_event ?? '',
         fixed_d1: editItem.fixed_d1 ?? false,
       }
@@ -59,7 +53,6 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
     if (prefill) {
       return {
         ...EMPTY_FORM,
-        subject: prefill.subject ?? EMPTY_FORM.subject,
         dueDate: prefill.dueDate ?? todayStr(),
         linked_event: prefill.linked_event ?? '',
       }
@@ -75,18 +68,17 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       setForm(buildInitial())
       setShowDeleteConfirm(false)
       setLinkedEventWarning(false)
-      // 편집 시에는 날짜 자동설정 OFF, 신규 추가 시에는 ON
-      setAutoDateActive(!isEdit)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
-  // linked_event 변경 시 자동 날짜 설정 (autoDateActive일 때만)
+  // 연결 학원이 있으면 마감일은 항상 자동(다음 수업 전날) — 없으면(1회성) 직접 입력
+  const linkedTitle = (form.linked_event === '__custom__' ? '' : form.linked_event)?.trim() ?? ''
+  const hasLinkedEvent = linkedTitle.length > 0
+
   useEffect(() => {
-    if (form.repeat || !autoDateActive) return
-    const title = (form.linked_event === '__custom__' ? '' : form.linked_event)?.trim()
-    if (!title) { setLinkedEventWarning(false); return }
-    const nextClass = findNextClassDate(title, schedules)
+    if (form.repeat || !hasLinkedEvent) { setLinkedEventWarning(false); return }
+    const nextClass = findNextClassDate(linkedTitle, schedules)
     if (nextClass) {
       setForm(p => ({ ...p, dueDate: prevDayStr(nextClass) }))
       setLinkedEventWarning(false)
@@ -94,11 +86,18 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       setLinkedEventWarning(true)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.linked_event, form.repeat, schedules, autoDateActive])
+  }, [linkedTitle, form.repeat, schedules, hasLinkedEvent])
 
   const resetAndClose = () => {
     setShowDeleteConfirm(false)
     onClose()
+  }
+
+  // 연결 학원의 일정 분류로 과목 자동 유추 (선택 UI 없이 내부적으로만 사용)
+  const deriveSubject = (title) => {
+    if (!title) return 'etc'
+    const matched = schedules.find(s => s.title === title)
+    return matched ? (CATEGORY_TO_SUBJECT[matched.category] ?? 'etc') : 'etc'
   }
 
   const handleSubmit = () => {
@@ -109,10 +108,11 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
       ...form,
       dueDate: form.repeat ? null : form.dueDate,
       memo: form.memo.trim() || null,
+      subject: deriveSubject(linkedTitle),
       linkedScheduleTitle: prefill?.sourceTitle ?? editItem?.linkedScheduleTitle ?? null,
-      linked_event: (form.linked_event === '__custom__' ? '' : form.linked_event).trim() || null,
-      estimated_minutes: Number(form.estimated_minutes) || 30,
+      linked_event: linkedTitle || null,
       // 삭제된 필드 기본값 유지 (기존 데이터 호환)
+      estimated_minutes: editItem?.estimated_minutes ?? 30,
       priority: editItem?.priority ?? 'medium',
       difficulty: editItem?.difficulty ?? '중',
       is_divisible: editItem?.is_divisible ?? false,
@@ -161,27 +161,6 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
           />
         </div>
 
-        {/* 과목 */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-600 mb-2">과목</label>
-          <div className="grid grid-cols-4 gap-2">
-            {Object.entries(HW_SUBJECTS).map(([key, subj]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setForm(p => ({ ...p, subject: key }))}
-                className={`py-2 rounded-xl text-sm font-medium border transition-all
-                  ${form.subject === key
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 text-slate-500'
-                  }`}
-              >
-                {subj.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* 매일 반복 */}
         <div className="flex items-center justify-between">
           <div>
@@ -197,44 +176,6 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
               ${form.repeat ? 'translate-x-6' : 'translate-x-0.5'}`} />
           </div>
         </div>
-
-        {/* 마감일 (repeat 모드엔 숨김) */}
-        {!form.repeat && (
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-1.5">
-                <label className="text-sm font-semibold text-slate-600">마감일 *</label>
-                {autoDateActive && form.linked_event?.trim() && form.linked_event !== '__custom__' && (
-                  <span className="flex items-center gap-0.5 text-xs text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md font-medium">
-                    <Wand2 size={10} /> 자동
-                  </span>
-                )}
-              </div>
-              {/* 자동↔직접 전환 버튼 */}
-              {form.linked_event?.trim() && form.linked_event !== '__custom__' && (
-                <button
-                  type="button"
-                  onClick={() => setAutoDateActive(v => !v)}
-                  className="text-xs text-slate-400 underline"
-                >
-                  {autoDateActive ? '직접 입력' : '자동 설정'}
-                </button>
-              )}
-            </div>
-            <input
-              type="date"
-              value={form.dueDate ?? ''}
-              onChange={e => {
-                setForm(p => ({ ...p, dueDate: e.target.value }))
-                setAutoDateActive(false)
-              }}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
-            {autoDateActive && form.linked_event?.trim() && form.linked_event !== '__custom__' && (
-              <p className="text-xs text-indigo-400 mt-1">{form.linked_event} 수업 전날로 자동 설정</p>
-            )}
-          </div>
-        )}
 
         {/* 연결 학원 + 전날 고정 */}
         <div className="flex flex-col gap-2">
@@ -255,7 +196,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
               }}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
             >
-              <option value="">선택 안 함</option>
+              <option value="">선택 안 함 (1회성 숙제)</option>
               {academyOptions.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
@@ -281,7 +222,7 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
               <span className="text-amber-400">일정 탭에서 학원 이름을 확인해 주세요.</span>
             </p>
           )}
-          {form.linked_event?.trim() && form.linked_event !== '__custom__' && (
+          {hasLinkedEvent && (
             <div className="flex items-center justify-between pl-1">
               <div>
                 <span className="text-sm font-medium text-slate-600">전날 고정 (D-1)</span>
@@ -299,18 +240,27 @@ export default function HomeworkFormModal({ isOpen, onClose, editItem = null, pr
           )}
         </div>
 
-        {/* 소요시간 */}
-        <div>
-          <label className="block text-sm font-semibold text-slate-600 mb-1">소요시간 (분)</label>
-          <input
-            type="number"
-            min="5"
-            step="5"
-            value={form.estimated_minutes}
-            onChange={e => setForm(p => ({ ...p, estimated_minutes: e.target.value }))}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-        </div>
+        {/* 마감일 — 연결 학원이 있으면 자동(읽기 전용), 없으면(1회성) 직접 입력 */}
+        {!form.repeat && (
+          hasLinkedEvent ? (
+            !linkedEventWarning && (
+              <div className="bg-indigo-50 rounded-xl px-3 py-2.5">
+                <p className="text-xs font-semibold text-indigo-500 mb-0.5">마감일 (자동)</p>
+                <p className="text-sm font-bold text-indigo-700">{form.dueDate} — {linkedTitle} 수업 전날</p>
+              </div>
+            )
+          ) : (
+            <div>
+              <label className="block text-sm font-semibold text-slate-600 mb-1">마감일 *</label>
+              <input
+                type="date"
+                value={form.dueDate ?? ''}
+                onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+          )
+        )}
 
         {/* 메모 */}
         <div>

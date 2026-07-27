@@ -8,6 +8,18 @@ export const HW_SUBJECTS = {
   etc:     { label: '기타',   color: 'bg-slate-100 text-slate-600',   dot: 'bg-slate-400' },
 }
 
+// 일정 분류(schedule category) → 숙제 과목 매핑 (연결 학원으로부터 과목 자동 유추용)
+export const CATEGORY_TO_SUBJECT = {
+  school:   'korean',
+  math:     'math',
+  english:  'english',
+  science:  'science',
+  arts:     'etc',
+  reading:  'reading',
+  mission:  'mission',
+  personal: 'etc',
+}
+
 export const PRIORITY = {
   high:   { label: '중요', color: 'text-red-500',    bg: 'bg-red-50' },
   medium: { label: '보통', color: 'text-yellow-500', bg: 'bg-yellow-50' },
