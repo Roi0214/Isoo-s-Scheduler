@@ -47,9 +47,12 @@ export default function NextTermSetup({ isOpen, onClose }) {
   // - 없으면 현재 활성 시간표를 기반으로 새로 시작
   useEffect(() => {
     if (isOpen) {
+      // effectiveTo가 있는 항목("이번 주만 추가" 등 기간 한정 일회성 항목)은 다음학기
+      // 일괄 적용으로 만든 게 아니므로 제외 — 그렇지 않으면 그런 항목의 날짜가 더 빠를 때
+      // 실제로 저장해 둔 다음학기 시간표 대신 그 임시 항목을 불러오게 된다.
       const upcoming = schedules
+        .filter(s => s.effectiveFrom && s.effectiveFrom > todayStr && !s.effectiveTo)
         .map(s => s.effectiveFrom)
-        .filter(d => d && d > todayStr)
         .sort()
       const nextTermDate = upcoming[0] ?? null
       const refDate = nextTermDate ?? todayStr
