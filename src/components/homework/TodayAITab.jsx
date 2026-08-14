@@ -93,6 +93,10 @@ export default function TodayAITab() {
   const incompleteTasks = deadlineTasks.filter(hw => hw.status !== 'completed')
   const allBoardDone = deadlineTasks.length > 0 && incompleteTasks.length === 0
 
+  // 오늘 할 숙제로 별표한(아직 안 끝난) 항목은 보드 맨 위에 별도 그룹으로 분리
+  const pickedTasks = deadlineTasks.filter(hw => hw.status !== 'completed' && isTodayPick(hw.id))
+  const restTasks = deadlineTasks.filter(hw => !(hw.status !== 'completed' && isTodayPick(hw.id)))
+
   // ── 렌더 ────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
@@ -187,20 +191,32 @@ export default function TodayAITab() {
             <p className="text-sm font-bold text-slate-600">남은 숙제가 없어요!</p>
             <p className="text-xs text-slate-400">정말 대단해요 👏</p>
           </div>
-        ) : allBoardDone ? (
-          <>
-            <div className="flex flex-col items-center py-5 gap-1 bg-indigo-50 rounded-2xl mb-2.5">
-              <span className="text-3xl">🌟</span>
-              <p className="text-sm font-bold text-indigo-600">모든 숙제 완료!</p>
-              <p className="text-xs text-indigo-400">오늘도 정말 잘했어요 🎉</p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {deadlineTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} isTodayPick={isTodayPick} toggleTodayPick={toggleTodayPick} />)}
-            </div>
-          </>
         ) : (
-          <div className="flex flex-col gap-1.5">
-            {deadlineTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} isTodayPick={isTodayPick} toggleTodayPick={toggleTodayPick} />)}
+          <div className="flex flex-col gap-3">
+            {allBoardDone && (
+              <div className="flex flex-col items-center py-5 gap-1 bg-indigo-50 rounded-2xl">
+                <span className="text-3xl">🌟</span>
+                <p className="text-sm font-bold text-indigo-600">모든 숙제 완료!</p>
+                <p className="text-xs text-indigo-400">오늘도 정말 잘했어요 🎉</p>
+              </div>
+            )}
+
+            {pickedTasks.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
+                  <Star size={12} className="text-amber-500" fill="currentColor" />
+                  <h3 className="text-xs font-bold text-amber-600">오늘 완료할 숙제</h3>
+                  <span className="text-xs text-amber-400">{pickedTasks.length}개</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {pickedTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} isTodayPick={isTodayPick} toggleTodayPick={toggleTodayPick} />)}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              {restTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} isTodayPick={isTodayPick} toggleTodayPick={toggleTodayPick} />)}
+            </div>
           </div>
         )}
       </section>

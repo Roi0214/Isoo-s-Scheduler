@@ -31,11 +31,16 @@ export default function NextTermSetup({ isOpen, onClose }) {
   const [draft, setDraft] = useState([])
   const [baselineIds, setBaselineIds] = useState([])
   const [effectiveDate, setEffectiveDate] = useState('')
+  const [originalNextTermDate, setOriginalNextTermDate] = useState(null)
   const [editItem, setEditItem] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [loadedExisting, setLoadedExisting] = useState(false)
   const [canvasWeek, setCanvasWeek] = useState(() => getWeekDates(today))
+
+  // 이미 만들어둔(아직 발효 전) 다음학기 일정이 있고, 적용 날짜를 그 날짜 그대로 두고 있는 경우에만
+  // "불러왔다" 안내를 보여준다. 사용자가 날짜를 다른 날로 바꾸면(=그 너머로 새 시간표를 짜는 중)
+  // 더 이상 "이미 만들어진 시간표"가 아니므로 안내 문구도 그에 맞게 달라져야 한다.
+  const loadedExisting = !!originalNextTermDate && effectiveDate === originalNextTermDate
 
   // 오버레이가 열릴 때마다 초안 구성:
   // - 이미 만들어둔(아직 발효 전) 다음학기 일정이 있으면 그 날짜 기준으로 불러와 이어서 편집
@@ -56,12 +61,22 @@ export default function NextTermSetup({ isOpen, onClose }) {
       setDraft(active)
       setBaselineIds(active.map(s => s.id))
       setEffectiveDate(nextTermDate ?? '')
-      setLoadedExisting(!!nextTermDate)
+      setOriginalNextTermDate(nextTermDate)
       setShowConfirm(false)
       setCanvasWeek(nextTermDate ? weekOnOrAfter(nextTermDate) : getWeekDates(today))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
+
+  // 적용 날짜를 바꾸면(기존에 불러온 날짜 너머로 다시 시간표를 짜려는 경우 포함) 캔버스도
+  // 그 날짜가 있는 주로 따라가야 한다. 이게 없으면 날짜만 바뀌고 화면은 그대로라 편집이
+  // 안 되는 것처럼 보인다.
+  useEffect(() => {
+    if (isOpen && effectiveDate) {
+      setCanvasWeek(weekOnOrAfter(effectiveDate))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveDate])
 
   if (!isOpen) return null
 
