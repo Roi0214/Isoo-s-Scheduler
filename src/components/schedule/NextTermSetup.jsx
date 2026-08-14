@@ -29,6 +29,7 @@ export default function NextTermSetup({ isOpen, onClose }) {
   const minDate = addDays(todayStr, 1)
 
   const [draft, setDraft] = useState([])
+  const [baselineIds, setBaselineIds] = useState([])
   const [effectiveDate, setEffectiveDate] = useState('')
   const [editItem, setEditItem] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -53,6 +54,7 @@ export default function NextTermSetup({ isOpen, onClose }) {
         .map(s => ({ ...s, exceptions: [] }))
 
       setDraft(active)
+      setBaselineIds(active.map(s => s.id))
       setEffectiveDate(nextTermDate ?? '')
       setLoadedExisting(!!nextTermDate)
       setShowConfirm(false)
@@ -76,7 +78,7 @@ export default function NextTermSetup({ isOpen, onClose }) {
   }
 
   const handleApply = () => {
-    applyNextTermSchedule(effectiveDate, draft)
+    applyNextTermSchedule(effectiveDate, draft, baselineIds)
     onClose()
   }
 

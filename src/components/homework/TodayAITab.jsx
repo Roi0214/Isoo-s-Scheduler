@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { CheckSquare, Square, Repeat, CalendarClock } from 'lucide-react'
+import { CheckSquare, Square, Repeat, CalendarClock, Star } from 'lucide-react'
 import { useHomework } from '../../context/HomeworkContext'
 import { useSchedule } from '../../context/ScheduleContext'
 import { localDateStr } from '../../utils/weekUtils'
 import { findNextClassDate, prevDayStr } from '../../utils/scheduleUtils'
 import HomeworkFormModal from './HomeworkFormModal'
+import DailyMemo from '../schedule/DailyMemo'
 
 // ── 과목 이모지 & 색상 ───────────────────────────────────────
 const SUBJECT = {
@@ -48,7 +49,7 @@ function dday(dueDate, today) {
 }
 
 export default function TodayAITab() {
-  const { homeworks, isCompleted, toggleCompleted, updateHomework } = useHomework()
+  const { homeworks, isCompleted, toggleCompleted, updateHomework, isTodayPick, toggleTodayPick } = useHomework()
   const { schedules } = useSchedule()
   const [editHw, setEditHw] = useState(null)
 
@@ -95,6 +96,9 @@ export default function TodayAITab() {
   // ── 렌더 ────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5">
+
+      {/* ════ 오늘의 메모 (일정 탭과 동일한 그 날의 메모) ════ */}
+      <DailyMemo dateStr={today} />
 
       {/* ════ 오늘의 루틴 ════ */}
       <section>
@@ -191,12 +195,12 @@ export default function TodayAITab() {
               <p className="text-xs text-indigo-400">오늘도 정말 잘했어요 🎉</p>
             </div>
             <div className="flex flex-col gap-1.5">
-              {deadlineTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} />)}
+              {deadlineTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} isTodayPick={isTodayPick} toggleTodayPick={toggleTodayPick} />)}
             </div>
           </>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {deadlineTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} />)}
+            {deadlineTasks.map(hw => <BoardCard key={hw.id} hw={hw} today={today} onEdit={setEditHw} updateHomework={updateHomework} isTodayPick={isTodayPick} toggleTodayPick={toggleTodayPick} />)}
           </div>
         )}
       </section>
@@ -211,17 +215,20 @@ export default function TodayAITab() {
 }
 
 // ── 남은 숙제 보드 카드 ──────────────────────────────────────
-function BoardCard({ hw, today, onEdit, updateHomework }) {
+function BoardCard({ hw, today, onEdit, updateHomework, isTodayPick, toggleTodayPick }) {
   const s = subj(hw.subject)
   const done = hw.status === 'completed'
   const dd = hw.dueDate ? dday(hw.dueDate, today) : null
   const overdue = hw.dueDate && hw.dueDate < today
+  const picked = isTodayPick(hw.id)
 
   return (
     <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-2xl border transition-all
       ${done
         ? 'bg-slate-50 border-slate-100 opacity-70'
-        : 'bg-white border-slate-100 shadow-sm'
+        : picked
+          ? 'bg-amber-50 border-amber-300'
+          : 'bg-white border-slate-100 shadow-sm'
       }`}
     >
       {/* 완료 토글 */}
@@ -234,6 +241,15 @@ function BoardCard({ hw, today, onEdit, updateHomework }) {
           ? <CheckSquare size={18} className="text-indigo-400" />
           : <Square size={18} className="text-slate-300 hover:text-indigo-400 transition-colors" />
         }
+      </button>
+
+      {/* 오늘 할 숙제 표시 */}
+      <button
+        onClick={() => toggleTodayPick(hw.id)}
+        aria-label={picked ? '오늘 할 숙제 해제' : '오늘 할 숙제로 표시'}
+        className={`flex-shrink-0 transition-colors ${picked ? 'text-amber-500' : 'text-slate-300 hover:text-amber-400'}`}
+      >
+        <Star size={16} fill={picked ? 'currentColor' : 'none'} />
       </button>
 
       {/* 과목 이모지 */}

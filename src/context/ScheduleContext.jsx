@@ -130,74 +130,40 @@ export function ScheduleProvider({ children }) {
     }])
   }, [])
 
-  // 다음학기 시간표 일괄 적용: draftItems를 effectiveDate부터 반영
-  // - 기존 항목과 id 같고 내용 동일 → 유지
-  // - 기존 항목과 id 같고 내용 다름:
-  //   - 이미 같은 effectiveDate로 분기된(아직 발효 전) 항목이면 → 재분기 없이 그대로 덮어쓰기
-  //     (발효 전 다음학기 안을 다시 열어 계속 고치는 경우 — 재분기하면 effectiveFrom>effectiveTo인
-  //      죽은 레코드가 생기므로 주의)
-  //   - 그 외(현재 활성 중인 항목) → 기존은 종료, draft 내용으로 새 버전 분기
-  // - 기존에만 있음(draft에서 삭제됨) → 이력 남기지 않고 완전 삭제
-  //   (예전엔 "종료"만 시키고 남겨뒀는데, 삭제 후 "+"로 재추가하는 실수가 반복되면서
-  //    죽은 레코드가 계속 쌓이는 문제가 있었음 — 삭제는 그냥 삭제되도록 단순화)
-  // - draft에만 있음(신규 추가) → effectiveFrom부터 새로 추가
-  const applyNextTermSchedule = useCallback((effectiveDate, draftItems) => {
+  // 다음학기 시간표 일괄 적용: 통째로 종료 + 통째로 새로 생성하는 단순한 방식
+  // (baselineIds = 초안을 만들 때 기준이 됐던 기존 항목 id 목록, NextTermSetup에서 전달)
+  // - baselineIds에 해당하는 기존 항목은 전부 종료 처리(effectiveTo)해서 과거 기록은 그대로 남김
+  //   단, 이미 같은 effectiveDate로 발효 전 분기돼 있던 항목은 이력 남길 필요 없이 완전 삭제
+  //   (그래야 하지 않으면 effectiveFrom==effectiveTo+1인 0일짜리 죽은 레코드가 생김)
+  // - draftItems(최종 편집 결과)는 항목별 비교 없이 전부 새 버전으로 생성
+  // - baselineIds에 없는 나머지 항목(다른 시점의 과거/미래 분기 등)은 그대로 둠
+  // 예전엔 "바뀐 것만 골라 처리"하려고 항목별로 내용을 비교했는데, 이 방식이 여러 edge case에서
+  // 깨져서(분류 기본값 차이로 오탐, 발효 전 분기 재수정 시 중복 등) 통째 교체로 단순화함
+  const applyNextTermSchedule = useCallback((effectiveDate, draftItems, baselineIds) => {
     const prev_ = new Date(effectiveDate + 'T00:00:00')
     prev_.setDate(prev_.getDate() - 1)
     const effectiveTo = `${prev_.getFullYear()}-${String(prev_.getMonth() + 1).padStart(2, '0')}-${String(prev_.getDate()).padStart(2, '0')}`
 
-    const SAME_FIELDS = ['title', 'startTime', 'endTime', 'category']
-    const sameContent = (a, b) =>
-      SAME_FIELDS.every(f => a[f] === b[f]) &&
-      a.days.length === b.days.length &&
-      a.days.every(d => b.days.includes(d))
-
     setSchedules(prev => {
-      const draftById = new Map(draftItems.map(d => [d.id, d]))
-      const currentIds = new Set(prev.map(s => s.id))
+      const baselineSet = new Set(baselineIds)
       let seq = 0
       const nextId = () => `schedule-${Date.now()}-${seq++}`
 
-      const result = []
-      for (const s of prev) {
-        const draft = draftById.get(s.id)
-        const isPendingBranch = s.effectiveFrom === effectiveDate
+      const untouched = prev.filter(s => !baselineSet.has(s.id))
 
-        if (!draft) {
-          continue // draft에서 삭제됨 → 이력 없이 완전 삭제
-        } else if (sameContent(s, draft)) {
-          // 변경 없음 → 유지
-          result.push(s)
-        } else if (isPendingBranch) {
-          // 발효 전 분기를 다시 수정 → 재분기 없이 덮어쓰기
-          result.push({ ...s, ...draft, effectiveFrom: effectiveDate, effectiveTo: null })
-        } else {
-          // 변경됨 → 기존 종료 + 새 버전 분기
-          result.push({ ...s, effectiveTo })
-          result.push({
-            ...draft,
-            id: nextId(),
-            effectiveFrom: effectiveDate,
-            effectiveTo: null,
-            exceptions: [],
-          })
-        }
-      }
+      const closed = prev
+        .filter(s => baselineSet.has(s.id) && s.effectiveFrom !== effectiveDate)
+        .map(s => ({ ...s, effectiveTo }))
 
-      // draft에만 있는 신규 항목
-      for (const d of draftItems) {
-        if (!currentIds.has(d.id)) {
-          result.push({
-            ...d,
-            id: nextId(),
-            effectiveFrom: effectiveDate,
-            effectiveTo: null,
-            exceptions: [],
-          })
-        }
-      }
+      const newVersions = draftItems.map(d => ({
+        ...d,
+        id: nextId(),
+        effectiveFrom: effectiveDate,
+        effectiveTo: null,
+        exceptions: [],
+      }))
 
-      return result
+      return [...untouched, ...closed, ...newVersions]
     })
   }, [])
 
