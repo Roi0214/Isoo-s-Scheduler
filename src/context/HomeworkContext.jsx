@@ -29,6 +29,11 @@ export function HomeworkProvider({ children }) {
     new Set(loadFromStorage('kid-scheduler:hwCompleted', []))
   )
 
+  // ── 오늘 할 숙제 표시 (완료 여부와 별개로 수동으로 골라두는 표시) ──
+  const [todaySet, setTodaySet] = useState(() =>
+    new Set(loadFromStorage('kid-scheduler:hwToday', []))
+  )
+
   // ── DB 초기 로드 완료 플래그 ────────────────────────────
   const [dbLoaded, setDbLoaded] = useState(false)
 
@@ -37,9 +42,11 @@ export function HomeworkProvider({ children }) {
     Promise.all([
       dbLoad('homeworks'),
       dbLoad('hwCompleted'),
-    ]).then(([remoteHw, remoteCompleted]) => {
+      dbLoad('hwToday'),
+    ]).then(([remoteHw, remoteCompleted, remoteToday]) => {
       if (remoteHw   !== null) setHomeworks(remoteHw.map(migrateHomework))
       if (remoteCompleted !== null) setCompletedSet(new Set(remoteCompleted))
+      if (remoteToday !== null) setTodaySet(new Set(remoteToday))
     }).catch(err => {
       console.warn('[HomeworkContext] DB 로드 실패, localStorage 사용:', err?.message)
     }).finally(() => setDbLoaded(true))
@@ -67,6 +74,17 @@ export function HomeworkProvider({ children }) {
       localStorage.setItem('kid-scheduler:hwCompleted', JSON.stringify(arr))
     }
   }, [completedSet, dbLoaded])
+
+  // ── 오늘 할 숙제 표시 변경 → localStorage + Supabase 저장 ──
+  useEffect(() => {
+    const arr = [...todaySet]
+    if (dbLoaded) {
+      localSave('hwToday', arr)
+      dbSave('hwToday', arr)
+    } else {
+      localStorage.setItem('kid-scheduler:hwToday', JSON.stringify(arr))
+    }
+  }, [todaySet, dbLoaded])
 
   // ── 학원 연동 숙제 자동 재활성화 ────────────────────────
   // DB 로드 완료 + schedules 준비 후 실행:
@@ -134,11 +152,22 @@ export function HomeworkProvider({ children }) {
 
   const completedCount = completedSet.size
 
+  const isTodayPick = useCallback((hwId) => todaySet.has(hwId), [todaySet])
+
+  const toggleTodayPick = useCallback((hwId) => {
+    setTodaySet(prev => {
+      const next = new Set(prev)
+      next.has(hwId) ? next.delete(hwId) : next.add(hwId)
+      return next
+    })
+  }, [])
+
   return (
     <HomeworkContext.Provider value={{
       homeworks,
       addHomework, updateHomework, deleteHomework,
       isCompleted, toggleCompleted, completedCount,
+      isTodayPick, toggleTodayPick,
       dbLoaded,
     }}>
       {children}

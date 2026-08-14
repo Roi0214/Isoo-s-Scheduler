@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, School, BookOpen, Pencil, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, School, BookOpen, Pencil, Plus, Star } from 'lucide-react'
 import HomeworkFormModal from './HomeworkFormModal'
 import { HW_SUBJECTS, getDueDateLabel } from '../../data/homeworkData'
 import { useHomework } from '../../context/HomeworkContext'
@@ -41,35 +41,57 @@ function groupHeaderColor(items) {
 
 /** 단일 숙제 row — 컴팩트 인벤토리 스타일 */
 function BacklogItem({ item, onEdit }) {
+  const { isTodayPick, toggleTodayPick } = useHomework()
   const subj = HW_SUBJECTS[item.subject] ?? HW_SUBJECTS.etc
+  const picked = isTodayPick(item.id)
 
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 bg-white rounded-xl border border-slate-100 hover:border-slate-200 transition-colors">
-      {/* 과목 배지 */}
-      <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${subj.color}`}>
-        {subj.label}
-      </span>
+    <div className={`flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors
+      ${picked ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
+      <div className="flex items-center gap-2.5">
+        {/* 오늘 할 숙제 표시 */}
+        <button
+          onClick={() => toggleTodayPick(item.id)}
+          aria-label={picked ? '오늘 할 숙제 해제' : '오늘 할 숙제로 표시'}
+          className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full transition-colors
+            ${picked ? 'text-amber-500' : 'text-slate-300 hover:text-amber-400'}`}
+        >
+          <Star size={15} fill={picked ? 'currentColor' : 'none'} />
+        </button>
 
-      {/* 제목 */}
-      <span className="flex-1 text-sm font-medium text-slate-700 truncate">
-        {item.title}
-      </span>
-
-      {/* 소요시간 */}
-      {item.estimated_minutes && (
-        <span className="text-xs text-slate-300 flex-shrink-0">
-          {item.estimated_minutes}분
+        {/* 과목 배지 */}
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${subj.color}`}>
+          {subj.label}
         </span>
-      )}
 
-      {/* 편집 버튼 */}
-      <button
-        onClick={onEdit}
-        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-slate-300 hover:text-indigo-400 hover:bg-indigo-50 transition-colors"
-        aria-label="편집"
-      >
-        <Pencil size={12} />
-      </button>
+        {/* 제목 */}
+        <span className="flex-1 text-sm font-medium text-slate-700 truncate">
+          {item.title}
+        </span>
+
+        {/* 소요시간 */}
+        {item.estimated_minutes && (
+          <span className="text-xs text-slate-300 flex-shrink-0">
+            {item.estimated_minutes}분
+          </span>
+        )}
+
+        {/* 편집 버튼 */}
+        <button
+          onClick={onEdit}
+          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-slate-300 hover:text-indigo-400 hover:bg-indigo-50 transition-colors"
+          aria-label="편집"
+        >
+          <Pencil size={12} />
+        </button>
+      </div>
+
+      {/* 메모 */}
+      {item.memo && (
+        <p className="pl-8 text-xs text-slate-400 leading-snug">
+          {item.memo}
+        </p>
+      )}
     </div>
   )
 }
