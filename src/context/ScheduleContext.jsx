@@ -137,9 +137,9 @@ export function ScheduleProvider({ children }) {
   //     (발효 전 다음학기 안을 다시 열어 계속 고치는 경우 — 재분기하면 effectiveFrom>effectiveTo인
   //      죽은 레코드가 생기므로 주의)
   //   - 그 외(현재 활성 중인 항목) → 기존은 종료, draft 내용으로 새 버전 분기
-  // - 기존에만 있음(draft에서 삭제됨):
-  //   - 아직 발효 전 분기였다면 → 이력 남길 필요 없이 완전 삭제
-  //   - 그 외 → 기존을 종료 (완전 삭제 아님)
+  // - 기존에만 있음(draft에서 삭제됨) → 이력 남기지 않고 완전 삭제
+  //   (예전엔 "종료"만 시키고 남겨뒀는데, 삭제 후 "+"로 재추가하는 실수가 반복되면서
+  //    죽은 레코드가 계속 쌓이는 문제가 있었음 — 삭제는 그냥 삭제되도록 단순화)
   // - draft에만 있음(신규 추가) → effectiveFrom부터 새로 추가
   const applyNextTermSchedule = useCallback((effectiveDate, draftItems) => {
     const prev_ = new Date(effectiveDate + 'T00:00:00')
@@ -164,10 +164,7 @@ export function ScheduleProvider({ children }) {
         const isPendingBranch = s.effectiveFrom === effectiveDate
 
         if (!draft) {
-          if (isPendingBranch) {
-            continue // 발효 전 분기를 draft에서 삭제 → 이력 없이 완전 제거
-          }
-          result.push({ ...s, effectiveTo })
+          continue // draft에서 삭제됨 → 이력 없이 완전 삭제
         } else if (sameContent(s, draft)) {
           // 변경 없음 → 유지
           result.push(s)
