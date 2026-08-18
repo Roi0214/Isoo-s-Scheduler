@@ -58,9 +58,14 @@ export default function NextTermSetup({ isOpen, onClose }) {
       const nextTermDate = upcoming[0] ?? null
       const refDate = nextTermDate ?? todayStr
 
+      // 초안 항목은 원래 갖고 있던 개별 effectiveFrom/To를 지운다 — 어차피 저장 시
+      // applyNextTermSchedule이 전부 새 effectiveDate 기준으로 재생성하므로, 편집 중인
+      // 캔버스에서는 그 원래 기간과 무관하게 어느 주로 이동해도 항상 보여야 한다.
+      // (지우지 않으면 원래 기간이 짧게 끝나는 항목은 그 기간 이후 주로 캔버스를 옮겼을 때
+      // 화면에서 사라져버린다.)
       const active = schedules
         .filter(s => (!s.effectiveFrom || s.effectiveFrom <= refDate) && (!s.effectiveTo || s.effectiveTo >= refDate))
-        .map(s => ({ ...s, exceptions: [] }))
+        .map(s => ({ ...s, exceptions: [], effectiveFrom: null, effectiveTo: null }))
 
       setDraft(active)
       setBaselineIds(active.map(s => s.id))
