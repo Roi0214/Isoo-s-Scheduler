@@ -155,12 +155,16 @@ export function ScheduleProvider({ children }) {
         .filter(s => baselineSet.has(s.id) && s.effectiveFrom !== effectiveDate)
         .map(s => ({ ...s, effectiveTo }))
 
+      // termBatch: 다음학기 일괄 적용으로 만들어진 항목임을 표시하는 태그(값 = effectiveDate).
+      // 개별로 추가한 일정도 effectiveTo가 null일 수 있어서 그것만으로는 "다음학기 일괄
+      // 적용분"인지 구분할 수 없었음 — 이 태그로 NextTermSetup이 정확히 구분한다.
       const newVersions = draftItems.map(d => ({
         ...d,
         id: nextId(),
         effectiveFrom: effectiveDate,
         effectiveTo: null,
         exceptions: [],
+        termBatch: effectiveDate,
       }))
 
       return [...untouched, ...closed, ...newVersions]

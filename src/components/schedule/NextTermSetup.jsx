@@ -47,12 +47,13 @@ export default function NextTermSetup({ isOpen, onClose }) {
   // - 없으면 현재 활성 시간표를 기반으로 새로 시작
   useEffect(() => {
     if (isOpen) {
-      // effectiveTo가 있는 항목("이번 주만 추가" 등 기간 한정 일회성 항목)은 다음학기
-      // 일괄 적용으로 만든 게 아니므로 제외 — 그렇지 않으면 그런 항목의 날짜가 더 빠를 때
-      // 실제로 저장해 둔 다음학기 시간표 대신 그 임시 항목을 불러오게 된다.
+      // termBatch 태그가 있는 항목만 "다음학기 일괄 적용"으로 만든 것으로 간주한다.
+      // effectiveFrom/effectiveTo만으로 판단하면, 기간 한정 일회성 항목("이번 주만 추가")이나
+      // 그냥 미래 날짜로 개별 추가한 일정("이노블스" 같은)도 조건을 만족해버려서
+      // 실제로 저장해 둔 다음학기 시간표 대신 그런 항목을 잘못 불러오는 문제가 있었다.
       const upcoming = schedules
-        .filter(s => s.effectiveFrom && s.effectiveFrom > todayStr && !s.effectiveTo)
-        .map(s => s.effectiveFrom)
+        .filter(s => s.termBatch && s.termBatch > todayStr)
+        .map(s => s.termBatch)
         .sort()
       const nextTermDate = upcoming[0] ?? null
       const refDate = nextTermDate ?? todayStr
