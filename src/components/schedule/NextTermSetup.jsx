@@ -3,6 +3,7 @@ import { X, Plus, CalendarClock } from 'lucide-react'
 import WeeklyTimetable from '../weekly/WeeklyTimetable'
 import NextTermItemModal from './NextTermItemModal'
 import { getWeekDates, shiftWeek, localDateStr } from '../../utils/weekUtils'
+import { getSchedulesForDate } from '../../data/scheduleData'
 import { useSchedule } from '../../context/ScheduleContext'
 
 function addDays(dateStr, n) {
@@ -42,9 +43,9 @@ export default function NextTermSetup({ isOpen, onClose }) {
   // 더 이상 "이미 만들어진 시간표"가 아니므로 안내 문구도 그에 맞게 달라져야 한다.
   const loadedExisting = !!originalNextTermDate && effectiveDate === originalNextTermDate
 
-  // 오버레이가 열릴 때마다 초안 구성:
-  // - 이미 만들어둔(아직 발효 전) 다음학기 일정이 있으면 그 날짜 기준으로 불러와 이어서 편집
-  // - 없으면 현재 활성 시간표를 기반으로 새로 시작
+  // 오버레이가 열릴 때 적용 날짜 초기값만 정한다:
+  // - 이미 만들어둔(아직 발효 전) 다음학기 일정이 있으면 그 날짜를 그대로 이어서 편집
+  // - 없으면 빈 값(아래 draft 구성 effect가 오늘 기준 주간표를 불러온다)
   useEffect(() => {
     if (isOpen) {
       // termBatch 태그가 있는 항목만 "다음학기 일괄 적용"으로 만든 것으로 간주한다.
@@ -56,36 +57,42 @@ export default function NextTermSetup({ isOpen, onClose }) {
         .map(s => s.termBatch)
         .sort()
       const nextTermDate = upcoming[0] ?? null
-      const refDate = nextTermDate ?? todayStr
 
-      // 초안 항목은 원래 갖고 있던 개별 effectiveFrom/To를 지운다 — 어차피 저장 시
-      // applyNextTermSchedule이 전부 새 effectiveDate 기준으로 재생성하므로, 편집 중인
-      // 캔버스에서는 그 원래 기간과 무관하게 어느 주로 이동해도 항상 보여야 한다.
-      // (지우지 않으면 원래 기간이 짧게 끝나는 항목은 그 기간 이후 주로 캔버스를 옮겼을 때
-      // 화면에서 사라져버린다.)
-      const active = schedules
-        .filter(s => (!s.effectiveFrom || s.effectiveFrom <= refDate) && (!s.effectiveTo || s.effectiveTo >= refDate))
-        .map(s => ({ ...s, exceptions: [], effectiveFrom: null, effectiveTo: null }))
-
-      setDraft(active)
-      setBaselineIds(active.map(s => s.id))
       setEffectiveDate(nextTermDate ?? '')
       setOriginalNextTermDate(nextTermDate)
       setShowConfirm(false)
-      setCanvasWeek(nextTermDate ? weekOnOrAfter(nextTermDate) : getWeekDates(today))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
-  // 적용 날짜를 바꾸면(기존에 불러온 날짜 너머로 다시 시간표를 짜려는 경우 포함) 캔버스도
-  // 그 날짜가 있는 주로 따라가야 한다. 이게 없으면 날짜만 바뀌고 화면은 그대로라 편집이
-  // 안 되는 것처럼 보인다.
+  // 적용 날짜가 정해지면(초기 로드 포함), 그 날짜가 속한 주에 "주간표" 화면에서 실제로
+  // 보이는 일정을 요일별로 그대로 모아 캔버스에 채운다 — 주간표에서 그 주를 볼 때와 동일한
+  // 내용이어야 한다는 게 이 기능의 원래 취지. (전에는 하나의 기준일 하나로만 전체 항목을
+  // effectiveFrom/To 비교했는데, 주 중간에 시작/종료되는 항목은 그 방식으로 걸러지지 않아서
+  // 실제 주간표와 다르게 나오는 문제가 있었다.)
   useEffect(() => {
-    if (isOpen && effectiveDate) {
-      setCanvasWeek(weekOnOrAfter(effectiveDate))
+    if (isOpen) {
+      const refDate = effectiveDate || todayStr
+      const week = weekOnOrAfter(refDate)
+
+      const seen = new Map()
+      week.slice(0, 6).forEach(date => {
+        getSchedulesForDate(schedules, date).forEach(s => {
+          if (!seen.has(s.id)) seen.set(s.id, s)
+        })
+      })
+      // 초안 항목은 원래 갖고 있던 개별 effectiveFrom/To를 지운다 — 어차피 저장 시
+      // applyNextTermSchedule이 전부 새 effectiveDate 기준으로 재생성하므로, 편집 중인
+      // 캔버스에서는 그 원래 기간과 무관하게 항상 보여야 한다.
+      const active = Array.from(seen.values())
+        .map(s => ({ ...s, exceptions: [], effectiveFrom: null, effectiveTo: null }))
+
+      setDraft(active)
+      setBaselineIds(active.map(s => s.id))
+      setCanvasWeek(week)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveDate])
+  }, [isOpen, effectiveDate])
 
   if (!isOpen) return null
 
